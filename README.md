@@ -16,6 +16,15 @@ to exclude noise
 
 next impulse the mean power can be calculated as 3600 / secs
 
+## Accuracy
+
+the display is actualized each time an impulse from energy meter is received.
+
+as the signals occur seldomer if the power is low, the display shows not the correct actual value.
+
+On 10W signal is send each 6minutes!
+
+
 
 # requirements
 

@@ -7,9 +7,6 @@
  * to exclude noise
  * 
  * next impulse the mean power can be calculated as 3600 / secs
- * 
- * 
- *  
  */
 
 
@@ -26,12 +23,22 @@ unsigned long sinceSignalMillis;
 unsigned long diffMillis;
 
 unsigned long power;
-int signalCounter; 
 int adValue = 1;
 
 boolean waitForValidation;
 boolean waitForReset;
 boolean interruptHandled;
+
+// --- Status variables that will be stored in eeprom --------------------------------- 
+#include "eeAny.h"
+#define EE_OFFSET 128
+struct {
+    long secondsTicker = 0;
+    int dailyWattHours = 0;
+    
+} storage;
+
+
 
 #include <Wire.h>
 #include <LiquidCrystal_SR2W.h>
@@ -62,7 +69,6 @@ String leftFill(String a, byte wantedLen, String fillLetter)
 }
 
 // methods for clock and Timer
-unsigned long secondsTicker;
 unsigned long lastDeciSecsIncMillis;
 byte deciSecondsCounter;
 
@@ -74,10 +80,12 @@ boolean incrementDeciSeconds()
         lastDeciSecsIncMillis += 100;
         if (deciSecondsCounter >= 10) {
           deciSecondsCounter = 0;
-          secondsTicker++;
+          storage.secondsTicker++;
           // midnight: 
-          if (secondsTicker > 86399) {
-            secondsTicker = 0;
+          if (storage.secondsTicker > 86399) {
+            storage.secondsTicker = 0;
+
+            storage.dailyWattHours = 0; // reset daily work
           }
         }
         
@@ -93,27 +101,18 @@ String seconds2hrsMinSec(unsigned long secsTicker)
     unsigned long hrs = secsTicker / 3600;
     byte mins = ( secsTicker - hrs * 3600 ) / 60;
     byte secs = secsTicker % 60; 
-    if (secs < 0) 
-    {
-         divis = "-";
-    }
-    return divis + leftFill(String(abs(hrs)), 2, "0") + ":" + leftFill(String(abs(mins)), 2, "0") + ":" +  leftFill(String(abs(secs)), 2, "0");
+    return leftFill(String(abs(hrs)), 2, "0") + ":" + leftFill(String(abs(mins)), 2, "0") + ":" +  leftFill(String(abs(secs)), 2, "0");
 }
-
-
-
-
 
 
 void setup()
 {
+  
   lastSignalMillis = 0;
   signalMillis = 0;
   diffMillis = 1000000;
-  signalCounter = 0; 
   waitForValidation = false;
   waitForReset = false;
-  kbdValue = 255;
   
   lcd.begin(16,2);               // initialize the lcd
   lcd.home();                   // go home
@@ -122,6 +121,12 @@ void setup()
   lcd.setCursor(0,1);
   lcd.print(" impuls counter");
   delay(1000);
+  
+  if (analogRead(PIN_ANALOG_KBD) < 100)  {
+    // if no key is pressed on start, read values from eeprom
+    EEPROM_readAnything(EE_OFFSET, storage);
+    }
+  
   lcd.noCursor();
   lcd.clear();
 
@@ -167,12 +172,12 @@ void loop(){
       if (waitForValidation) {
         if (sinceSignalMillis > MIN_SIGNAL_PERIOD  ) {
 //          Serial.println("act:" + String(signalMillis) + " since:" + String(sinceSignalMillis));
-          signalCounter++;
+          storage.dailyWattHours++;
     
           diffMillis = signalMillis - lastSignalMillis;
           lastSignalMillis = signalMillis;
           
-          if (signalCounter > 1) {
+          if (storage.dailyWattHours > 1) {
             // wait to second event as the first is incorrect !
             power = 3600000 / diffMillis; 
           }
@@ -184,39 +189,46 @@ void loop(){
 
     // update display each 100ms
     if (incrementDeciSeconds()) {
+      float kwh = storage.dailyWattHours / 1000.0;
       lcd.setCursor(0,0);
-      lcd.print(leftFill(String(signalCounter), 4, " ") + "Wh     " + leftFill(String(power), 4, " ") + "W ");
+      lcd.print(leftFill(String(power), 4, " ") + "W  " + leftFill(String(kwh, 3), 6, " ") + "kWh");
       lcd.setCursor(0,1);
-      lcd.print("        " + seconds2hrsMinSec(secondsTicker));
+      lcd.print(String("30.4") + "\xdf" + "C     " + seconds2hrsMinSec(storage.secondsTicker));
       
       //float temp = 0.1105 * adValue + 0.583;
       //lcd.print("" + String(adValue) + "  t=" + String(temp) + "\xdf"+"C       ");
 
     }
     
-    // input from keyboard
-    if (kbdValue != 255) //pressed
+    // input from keyboard 
+    if (kbdValue != 255) //key is pressed
         {
             switch (kbdValue)
             {
             case 0:
-                // Vortag?
+                EEPROM_writeAnything(EE_OFFSET, storage);
+                lcd.setCursor(0,1);
+                lcd.print("stored. ");
+                delay(1000);
                 break;
              
             case 3:
-                secondsTicker += 60;
+                storage.secondsTicker += 60;
                 break;
             case 2:
-                secondsTicker += 3600;
+                storage.secondsTicker += 3600;
                 break;
             case 131: // key 2 long
-                secondsTicker -= 60;
+                storage.secondsTicker -= 60;
                 break;
             case 130:
-                secondsTicker -= 3600;
+                storage.secondsTicker -= 3600;
                 break;
             default:
                 break;
+            }
+            if (storage.secondsTicker < 0) {
+              storage.secondsTicker += 86400;
             }
          }
         kbdValue = kbd.read();
