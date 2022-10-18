@@ -9,7 +9,7 @@
  * next impulse the mean power can be calculated as 3600 / secs
  */
 
-#define FAST 1
+//#define FAST 1
 
 #define ANALOG_PIN 1
 #define SIGNAL_PIN 2
@@ -32,7 +32,7 @@ boolean waitForValidation;
 boolean waitForReset;
 boolean interruptHandled;
 
-
+const String dow[7] = {"Mo", "Di", "Mi", "Do", "Fr", "Sa", "So" };
 
 // --- Variables that will be stored in eeprom if system goes power off --------------------- 
 #include "eeAny.h"
@@ -212,7 +212,7 @@ void loop(){
         lcd.setCursor(0,0);
         lcd.print(leftFill(String(power), 4, " ") + "W  " + leftFill(String(kwh, 3), 6, " ") + "kWh");
         lcd.setCursor(0,1);
-        lcd.print(String("30.4") + "\xdf" + "C     " + seconds2hrsMinSec(storage.secondsTicker));
+        lcd.print(String("00") + "\xdf" + "C   " + dow[storage.day] + " " + seconds2hrsMinSec(storage.secondsTicker));
        
       }
       else {
@@ -314,7 +314,7 @@ void loop(){
             case 2:
                 storage.day++;
                 if (storage.day > 6) {
-                  storage.day += 0;
+                  storage.day = 0;
                 }
                 break;
             case 3:
