@@ -9,51 +9,36 @@
  * next impulse the mean power can be calculated as 3600 / secs
  */
 
-//#define FAST 1
-
-#define ANALOG_PIN 1
+#define ANALOG_TEMPSENSOR_PIN 1
 #define SIGNAL_PIN 2
-
-// a signal must remain for at least some millisecs
-#define MIN_SIGNAL_PERIOD 70
-
-unsigned long lastSignalMillis;
-unsigned long signalMillis;
-unsigned long actMillis;
-unsigned long sinceSignalMillis;
-unsigned long diffMillis;
 
 unsigned long power;
 int adValue = 1;
 byte showHistEntry = 0; 
 long resetshowHistEntrySeconds = 0;
 
-boolean waitForValidation;
-boolean waitForReset;
-boolean interruptHandled;
 
-const String dow[7] = {"Mo", "Di", "Mi", "Do", "Fr", "Sa", "So" };
+// --- liquid crystal display driver from  ---------------------------------------------
+//#define USE_STANDARD_LCD 1
 
-// --- Variables that will be stored in eeprom if system goes power off --------------------- 
-#include "eeAny.h"
-#define EE_OFFSET 128
-struct {
-    long secondsTicker = 0;
-    unsigned int daysTicker = 0;
-    byte day = 0;
-    unsigned long totalWh = 0;
-    unsigned long daysWh[6] = {0, 0, 0, 0, 0 };
-    unsigned long weeksWh[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    unsigned long quartersWh[8] = {0, 0, 0, 0, 0, 0, 0};
+#ifdef USE_STANDARD_LCD
+  // using the standard LCD Library
+  #include <LiquidCrystal.h>
+  //            lcd(rs, en, d4, d5, d6, d7); backlight: pin D6
+  LiquidCrystal lcd(8,  7,   9, 10, 11, 12);
+  
+  void setBacklight(byte state) {
+    digitalWrite(6, state);
+  }
+#else
+  // using the latchregister
+  #include <LiquidCrystal_SR2W.h>
+  LiquidCrystal_SR2W lcd(8, 7, POSITIVE);
 
-} storage;
-// ------------------------------------------------------------------------------------------
-
-
-#include <Wire.h>
-#include <LiquidCrystal_SR2W.h>
-
-LiquidCrystal_SR2W lcd(8, 7, POSITIVE);
+  void setBacklight(byte state) {
+    lcd.setBacklight(state);
+  }
+#endif // USE_STANDARD_LCD
 
 
 // --- keyboard driver from AnalogKbd.cpp ---------------------------------------------
@@ -67,6 +52,10 @@ AnalogKbd kbd(PIN_ANALOG_KBD, KBD_NR_OF_KEYS, KBD_RELIABLE_TIME_DELTA, KBD_LONGP
 byte kbdValue = 255; //the value that is read from keyboard 255 is neutral value
 
 
+// --- timer helpers from TimeLoop.cpp ---------------------------------------------
+#include<TimeLoop.h>
+TimeLoop tmh(1);
+
 // string helper.. 
 String leftFill(String a, byte wantedLen, String fillLetter)
 {
@@ -79,57 +68,51 @@ String leftFill(String a, byte wantedLen, String fillLetter)
 }
 
 
-// methods for clock and Timer --------------------------------------------------------
-unsigned long lastDeciSecsIncMillis;
-byte deciSecondsCounter;
+// --- Variables that will be stored in eeprom if system goes power off --------------------- 
+#include "eeAny.h"
+#define EE_OFFSET 128
+struct {
+    long secondsTicker = 0;
+    long dayTicker = 0;
+    unsigned long totalWh = 0;
+    unsigned long daysWh[7] = {0, 0, 0, 0, 0, 0, 0}; // monday = 0 
+    unsigned long monthsWh[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ,0}; // jan = 1, dec = 12
+} storage;
 
-boolean incrementDeciSeconds()
-{
-    if (millis() - lastDeciSecsIncMillis >= 100 )
-    {
-        deciSecondsCounter++;
-        lastDeciSecsIncMillis += 100;
-        if (deciSecondsCounter >= 10) {
-          deciSecondsCounter = 0;
-          
-          storage.secondsTicker++;
- #ifdef FAST
- storage.secondsTicker += 3599; //one sec is one hour
- #endif         
-        }
-        
-        return true;
-    }
-    return false;
+
+void loadEEprom() {
+  EEPROM_readAnything(EE_OFFSET, storage);
+  tmh.setSecondsTicker(storage.secondsTicker);
+  tmh.setDayTicker(storage.dayTicker);
+  lcd.setCursor(0,1);
+  lcd.print("data loaded. ");
+  delay(1000);
+  
 }
 
-
-String seconds2hrsMinSec(unsigned long secsTicker)
-{
-    String divis = "";
-    unsigned long hrs = secsTicker / 3600;
-    byte mins = ( secsTicker - hrs * 3600 ) / 60;
-    byte secs = secsTicker % 60; 
-    return leftFill(String(abs(hrs)), 2, "0") + ":" + leftFill(String(abs(mins)), 2, "0") + ":" +  leftFill(String(abs(secs)), 2, "0");
+void storeEEprom() {
+  storage.secondsTicker = tmh.getSecondsTicker();
+  storage.dayTicker = tmh.getDayTicker();
+  EEPROM_writeAnything(EE_OFFSET, storage);
+  lcd.setCursor(0,1);
+  lcd.print("data stored. ");
+  delay(1000);
 }
+// ------------------------------------------------------------------------------------------
+
+
 
 // Initialization ---------------------------------------------------------------------------
 
 void setup()
 {
   
-  lastSignalMillis = 0;
-  signalMillis = 0;
-  diffMillis = 1000000;
-  waitForValidation = false;
-  waitForReset = false;
-
   showHistEntry = 0; // 0 means actual day.
   resetshowHistEntrySeconds = 0;
   
   lcd.begin(16,2);               // initialize the lcd
-  lcd.home();                   // go home
-  lcd.setBacklight(1);
+  lcd.home();                   // go home  
+  setBacklight(1);
   lcd.print("   OR-WE-521");
   lcd.setCursor(0,1);
   lcd.print(" impuls counter");
@@ -137,9 +120,9 @@ void setup()
   
   if (analogRead(PIN_ANALOG_KBD) < 100)  {
     // if no key is pressed on start, read values from eeprom
-    EEPROM_readAnything(EE_OFFSET, storage);
+    loadEEprom();
     }
-  
+
   lcd.noCursor();
   lcd.clear();
 
@@ -159,69 +142,74 @@ void setup()
 // Mainloop ---------------------------------------------------------------------------
 
 void loop(){
-    delay(1);
-    // actual Time
-    actMillis = millis();
 
-    // read the pin
-    byte pinLevel = digitalRead(SIGNAL_PIN);
-    
-    if (pinLevel == 1) {
-      // if positive, store the time once and then wait vor it to validate 
-      if (!waitForValidation and !waitForReset) {
-        signalMillis = actMillis;    
-        waitForValidation = true;
-//        Serial.println("signal candidate at: " + String(signalMillis) );
-      }
-       
-    }
-    else {
-      if (true) {
-        waitForReset = false;
-        waitForValidation = false;
-      }
+    // get the milliseconds between last and actual signal.
+    //  if a result is valid, a value > 0 is passed back
+    unsigned long timeDeltaMillis = getStableSignalDelta(SIGNAL_PIN);
+    if ( timeDeltaMillis > 0 ) {
+      // one impulse received means 1 Wh was comsumed. time passed since last impulse --> power
       
+      storage.daysWh[tmh.getDow(0)]++;
+      storage.totalWh++;
+      power = 3600000 / timeDeltaMillis; 
     }
-    sinceSignalMillis = actMillis - signalMillis;
+   
+    byte timeState = tmh.actualize(); // update the timeloop handler. state: 0: nothing; 1: 100ms passed; 2: 1s passed; 3: midnight
 
-    if (!waitForReset) {
-      if (waitForValidation) {
-        if (sinceSignalMillis > MIN_SIGNAL_PERIOD  ) {
-//          Serial.println("act:" + String(signalMillis) + " since:" + String(sinceSignalMillis));
-          storage.daysWh[0]++;
-          storage.totalWh++;
-    
-          diffMillis = signalMillis - lastSignalMillis;
-          lastSignalMillis = signalMillis;
-          
-          if (storage.daysWh[0] > 1) {
-            // wait to second event as the first is incorrect !
-            power = 3600000 / diffMillis; 
-          }
-          waitForValidation = false;
-          waitForReset = true;
+    if ( timeState >= 1 ) {
+      // --- 100ms has passed ---- 
+ 
+      if ( timeState >= 3 ) {
+        // ----  action at midnight: fill the history --------------------------
+
+        Serial.println("endofday: " + String(storage.daysWh[0]) + " total " + String(storage.totalWh) );
+        storage.weeksWh[0] += storage.daysWh[0];
+        storage.totalWh += storage.daysWh[0];
+        // shift the array with the last weekdays Wh to right and add the actual on index 0
+        for(int i=6; i>=0; i--){
+          storage.daysWh[i] = storage.daysWh[i-1];
         }
-      }
-    }
 
-    // update display each 100ms --------------------------------
-    if ( incrementDeciSeconds() ) {
-      float kwh = storage.daysWh[0] / 1000.0;
+        byte newDay = tmh.getDow(0);
+        
+        if (newDay = 0) {
+          // End of Week
+          storage.day = 0;
+          for(int i=12; i>=0; i--){
+            storage.weeksWh[i] = storage.weeksWh[i-1];
+            }
+          
+        }
+       
+        storage.daysWh[0] = 0; // reset daily work
+      } // midnight
+
+        
+       
       
+      float kwh = storage.daysWh[0] / 1000.0;
+      //float temp = 0.1105 * adValue + 0.583;
+      //lcd.print("" + String(adValue) + "  t=" + String(temp) + "\xdf"+"C       ");
+
+
+      // ---- refresh display ----------------------------------------------------------------------------
       if ( showHistEntry == 0 ) {
+        // -- display normal information 
         lcd.setCursor(0,0);
         lcd.print(leftFill(String(power), 4, " ") + "W  " + leftFill(String(kwh, 3), 6, " ") + "kWh");
         lcd.setCursor(0,1);
-        lcd.print(String("00") + "\xdf" + "C   " + dow[storage.day] + " " + seconds2hrsMinSec(storage.secondsTicker));
+        lcd.print(String("39.2") + "\xdf" + "C  " + tmh.getDowName() + " " + tmh.getHrsMinSec());
        
       }
       else {
         if ( showHistEntry == 2 ) {
+          // -- display overall kWh
           lcd.clear();
           kwh = storage.totalWh / 1000.0;
           lcd.print("Ges. : " + leftFill(String(kwh, 1), 6, " ") + "kWh");
         }
         else {
+          // -- flipp through the history ... 
           int index = 0;
           String label = "";
           unsigned long wh1 = 0;
@@ -236,11 +224,11 @@ void loop(){
               wh2 = storage.daysWh[index + 1];
               break;
             case 10 ... 22:
-              // days hist
+              // months hist
               index = showHistEntry - 9;
               label = "Wo.";
-              wh1 = storage.weeksWh[index];
-              wh2 = storage.weeksWh[index + 1];
+              wh1 = storage.monthsWh[index];
+              wh2 = storage.monthsWh[index + 1];
               break;
             
           }
@@ -251,45 +239,17 @@ void loop(){
           lcd.setCursor(0,1);
           kwh = wh2;
           lcd.print(label + leftFill("-" + String(index + 1), 3, " ") + ": " + leftFill(String(kwh, 1), 5, " ") + "kWh");
-         }
+        }
          
-        if (storage.secondsTicker > resetshowHistEntrySeconds ) {
+        if (tmh.getSecondsTicker() > resetshowHistEntrySeconds ) {
           // fall back to standard display
-
-#ifndef FAST
           showHistEntry = 0;
-#endif         
         }
-       
       }
-      //float temp = 0.1105 * adValue + 0.583;
-      //lcd.print("" + String(adValue) + "  t=" + String(temp) + "\xdf"+"C       ");
-
-      // action at midnight: fill the history --------------------------
-      
-      if (storage.secondsTicker > 86399) {
-        Serial.println("endofday: " + String(storage.daysWh[0]) + " total " + String(storage.totalWh) );
-        storage.secondsTicker = 0;
-        storage.day++;
-        storage.weeksWh[0] += storage.daysWh[0];
-        storage.totalWh += storage.daysWh[0];
-        // shift the array with the last weekdays Wh to right and add the actual on index 0
-        for(int i=6; i>=0; i--){
-          storage.daysWh[i] = storage.daysWh[i-1];
-        }
-       
-        if (storage.day > 6) {
-          // End of Week
-          storage.day = 0;
-          for(int i=12; i>=0; i--){
-            storage.weeksWh[i] = storage.weeksWh[i-1];
-            }
-          
-        }
-       
-        storage.daysWh[0] = 0; // reset daily work
-      }
-
+    } // 100ms
+ 
+    else {
+      delay(1); //minimum loop time if nothing else happened...       
     }
     
     // input from keyboard -----------------------
@@ -298,43 +258,37 @@ void loop(){
             switch (kbdValue)
             {
             case 0:
-                EEPROM_writeAnything(EE_OFFSET, storage);
-                lcd.setCursor(0,1);
-                lcd.print("stored. ");
-                delay(1000);
+                storeEEprom();
                 break;
-             
             case 1:
                 showHistEntry += 2;
                 if ( showHistEntry > 20 ) {
                   showHistEntry = 0;
                 }
-                resetshowHistEntrySeconds = storage.secondsTicker + 5;
+                resetshowHistEntrySeconds = tmh.getSecondsTicker() + 5;
                 break;
             case 2:
-                storage.day++;
-                if (storage.day > 6) {
-                  storage.day = 0;
-                }
+                tmh.incrementDayTicker(1);
                 break;
             case 3:
-                storage.secondsTicker += 3600;
+                tmh.incrementSecondsTicker(3600);
                 break;
             case 4:
-                storage.secondsTicker += 60;
+                tmh.incrementSecondsTicker(60);
+                break;
+            case 130:  // key 2 long
+                tmh.incrementDayTicker(-1);
                 break;
             case 131: // key 3 long
-                storage.secondsTicker -= 3600;
+                tmh.incrementSecondsTicker(-3600);
                 break;
             case 132: // key 4 long
-                storage.secondsTicker -= 60;
+                tmh.incrementSecondsTicker(-60);
                 break;
             default:
                 break;
             }
-            if (storage.secondsTicker < 0) {
-              storage.secondsTicker += 86400;
-            }
+
          }
         kbdValue = kbd.read();
 
