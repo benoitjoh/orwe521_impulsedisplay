@@ -16,7 +16,7 @@ unsigned long power;
 int adValue = 1;
 byte showHistEntry = 0; 
 long resetshowHistEntrySeconds = 0;
-
+byte actualMonth = 0;
 
 // --- liquid crystal display driver from  ---------------------------------------------
 //#define USE_STANDARD_LCD 1
@@ -56,7 +56,7 @@ byte kbdValue = 255; //the value that is read from keyboard 255 is neutral value
 #include<TimeLoop.h>
 TimeLoop tmh(1);
 
-// string helper.. 
+// ---- string helper   ---------------------------------------------------------------  
 String leftFill(String a, byte wantedLen, String fillLetter)
 {
     // fills a string with letters from left side that the resulting length is reached
@@ -72,8 +72,8 @@ String leftFill(String a, byte wantedLen, String fillLetter)
 #include "eeAny.h"
 #define EE_OFFSET 128
 struct {
-    long secondsTicker = 0;
-    long dayTicker = 0;
+    long secondsCounter = 0;
+    long dayCounter = 0;
     unsigned long totalWh = 0;
     unsigned long daysWh[7] = {0, 0, 0, 0, 0, 0, 0}; // monday = 0 
     unsigned long monthsWh[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ,0}; // jan = 1, dec = 12
@@ -82,8 +82,8 @@ struct {
 
 void loadEEprom() {
   EEPROM_readAnything(EE_OFFSET, storage);
-  tmh.setSecondsTicker(storage.secondsTicker);
-  tmh.setDayTicker(storage.dayTicker);
+  tmh.setSecondsCounter(storage.secondsCounter);
+  tmh.setDayCounter(storage.dayCounter);
   lcd.setCursor(0,1);
   lcd.print("data loaded. ");
   delay(1000);
@@ -91,8 +91,8 @@ void loadEEprom() {
 }
 
 void storeEEprom() {
-  storage.secondsTicker = tmh.getSecondsTicker();
-  storage.dayTicker = tmh.getDayTicker();
+  storage.secondsCounter = tmh.getSecondsCounter();
+  storage.dayCounter = tmh.getDayCounter();
   EEPROM_writeAnything(EE_OFFSET, storage);
   lcd.setCursor(0,1);
   lcd.print("data stored. ");
@@ -122,7 +122,7 @@ void setup()
     // if no key is pressed on start, read values from eeprom
     loadEEprom();
     }
-
+  actualMonth = tmh.getMonth(0);
   lcd.noCursor();
   lcd.clear();
 
@@ -150,6 +150,7 @@ void loop(){
       // one impulse received means 1 Wh was comsumed. time passed since last impulse --> power
       
       storage.daysWh[tmh.getDow(0)]++;
+      storage.monthsWh[tmh.getMonth(0)]++;
       storage.totalWh++;
       power = 3600000 / timeDeltaMillis; 
     }
@@ -162,30 +163,13 @@ void loop(){
       if ( timeState >= 3 ) {
         // ----  action at midnight: fill the history --------------------------
 
-        Serial.println("endofday: " + String(storage.daysWh[0]) + " total " + String(storage.totalWh) );
-        storage.weeksWh[0] += storage.daysWh[0];
-        storage.totalWh += storage.daysWh[0];
-        // shift the array with the last weekdays Wh to right and add the actual on index 0
-        for(int i=6; i>=0; i--){
-          storage.daysWh[i] = storage.daysWh[i-1];
+        Serial.println("New day: " + String(tmh.getDowName()) + " yesterday: " + String(storage.daysWh[tmh.getDow(-1)]) + "Wh" );
+        if ( actualMonth != tmh.getMonth(0) ) {
+          storage.monthsWh[tmh.getMonth(0)] = 0;
         }
-
-        byte newDay = tmh.getDow(0);
         
-        if (newDay = 0) {
-          // End of Week
-          storage.day = 0;
-          for(int i=12; i>=0; i--){
-            storage.weeksWh[i] = storage.weeksWh[i-1];
-            }
-          
-        }
-       
-        storage.daysWh[0] = 0; // reset daily work
-      } // midnight
-
-        
-       
+        storeEEprom();       
+      }       
       
       float kwh = storage.daysWh[0] / 1000.0;
       //float temp = 0.1105 * adValue + 0.583;
@@ -199,7 +183,6 @@ void loop(){
         lcd.print(leftFill(String(power), 4, " ") + "W  " + leftFill(String(kwh, 3), 6, " ") + "kWh");
         lcd.setCursor(0,1);
         lcd.print(String("39.2") + "\xdf" + "C  " + tmh.getDowName() + " " + tmh.getHrsMinSec());
-       
       }
       else {
         if ( showHistEntry == 2 ) {
@@ -241,7 +224,7 @@ void loop(){
           lcd.print(label + leftFill("-" + String(index + 1), 3, " ") + ": " + leftFill(String(kwh, 1), 5, " ") + "kWh");
         }
          
-        if (tmh.getSecondsTicker() > resetshowHistEntrySeconds ) {
+        if (tmh.getSecondsCounter() > resetshowHistEntrySeconds ) {
           // fall back to standard display
           showHistEntry = 0;
         }
@@ -252,7 +235,8 @@ void loop(){
       delay(1); //minimum loop time if nothing else happened...       
     }
     
-    // input from keyboard -----------------------
+    // ---- deal with an eventually pressed key -----------------------
+    kbdValue = kbd.read();
     if (kbdValue != 255) //key is pressed
         {
             switch (kbdValue)
@@ -265,31 +249,28 @@ void loop(){
                 if ( showHistEntry > 20 ) {
                   showHistEntry = 0;
                 }
-                resetshowHistEntrySeconds = tmh.getSecondsTicker() + 5;
+                resetshowHistEntrySeconds = tmh.getSecondsCounter() + 5;
                 break;
             case 2:
-                tmh.incrementDayTicker(1);
+                tmh.incrementDayCounter(1);
                 break;
             case 3:
-                tmh.incrementSecondsTicker(3600);
+                tmh.incrementSecondsCounter(3600);
                 break;
             case 4:
-                tmh.incrementSecondsTicker(60);
+                tmh.incrementSecondsCounter(60);
                 break;
             case 130:  // key 2 long
-                tmh.incrementDayTicker(-1);
+                tmh.incrementDayCounter(-1);
                 break;
             case 131: // key 3 long
-                tmh.incrementSecondsTicker(-3600);
+                tmh.incrementSecondsCounter(-3600);
                 break;
             case 132: // key 4 long
-                tmh.incrementSecondsTicker(-60);
+                tmh.incrementSecondsCounter(-60);
                 break;
             default:
                 break;
             }
-
          }
-        kbdValue = kbd.read();
-
   }
