@@ -31,7 +31,7 @@ unsigned long getStableSignalDelta(byte pin) {
       if (!waitForValidation and !waitForReset) {
         signalMillis = actMillis;    
         waitForValidation = true;
-//        Serial.println("signal candidate at: " + String(signalMillis) );
+        Serial.println("signal candidate at: " + String(signalMillis) );
       }
        
     }
@@ -47,15 +47,11 @@ unsigned long getStableSignalDelta(byte pin) {
     if (!waitForReset) {
       if (waitForValidation) {
         if ( signalStableMillis > MIN_SIGNAL_PERIOD  ) {
-//          Serial.println("act:" + String(signalMillis) + " since:" + String(signalStableMillis));
+          timeDeltaMillis = signalMillis - lastSignalMillis;
           lastSignalMillis = signalMillis;
-          
-          if (storage.daysWh[0] > 1) {
-            // wait to second event as the first is incorrect !
-            timeDeltaMillis = signalMillis - lastSignalMillis;
-          }
           waitForValidation = false;
           waitForReset = true;
+          Serial.println("act:" + String(signalMillis) + " delta:" + String(timeDeltaMillis));
         }
       }
     }

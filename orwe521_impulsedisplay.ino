@@ -72,21 +72,27 @@ String leftFill(String a, byte wantedLen, String fillLetter)
 #include "eeAny.h"
 #define EE_OFFSET 128
 struct {
-    long secondsCounter = 0;
-    long dayCounter = 0;
+    long secondsCounter = 70000;
+    long dayCounter = 100;
     unsigned long totalWh = 0;
-    unsigned long daysWh[7] = {0, 0, 0, 0, 0, 0, 0}; // monday = 0 
-    unsigned long monthsWh[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ,0}; // jan = 1, dec = 12
+    unsigned long daysWh[7] = {0, 1, 2, 3, 4, 5, 6}; // monday = 0 
+    unsigned long monthsWh[13] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 ,12}; // jan = 1, dec = 12
 } storage;
 
 
-void loadEEprom() {
-  EEPROM_readAnything(EE_OFFSET, storage);
+void loadEEprom(bool reset) {
+  lcd.setCursor(0,1);
+  if (!reset) {
+    EEPROM_readAnything(EE_OFFSET, storage);
+    lcd.print("data loaded.     ");
+  }
+  else {
+    lcd.print("EEPROM reset.     ");
+  }
   tmh.setSecondsCounter(storage.secondsCounter);
   tmh.setDayCounter(storage.dayCounter);
-  lcd.setCursor(0,1);
-  lcd.print("data loaded. ");
-  delay(1000);
+  
+  delay(800);
   
 }
 
@@ -118,16 +124,15 @@ void setup()
   lcd.print(" impuls counter");
   delay(1000);
   
-  if (analogRead(PIN_ANALOG_KBD) < 100)  {
-    // if no key is pressed on start, read values from eeprom
-    loadEEprom();
-    }
-  actualMonth = tmh.getMonth(0);
+  // if no key is pressed on start, read values from eeprom, else reset
+  loadEEprom( bool(analogRead(PIN_ANALOG_KBD) > 100) );
+  
   lcd.noCursor();
   lcd.clear();
 
   // pin for signal from OR-WE-521 
   pinMode(SIGNAL_PIN, INPUT);
+  pinMode(13, OUTPUT);
   
   // serial device for debugging purpose!
   Serial.begin(9600);
@@ -142,6 +147,7 @@ void setup()
 // Mainloop ---------------------------------------------------------------------------
 
 void loop(){
+    actualMonth = tmh.getMonth(0);
 
     // get the milliseconds between last and actual signal.
     //  if a result is valid, a value > 0 is passed back
@@ -158,8 +164,8 @@ void loop(){
     byte timeState = tmh.actualize(); // update the timeloop handler. state: 0: nothing; 1: 100ms passed; 2: 1s passed; 3: midnight
 
     if ( timeState >= 1 ) {
-      // --- 100ms has passed ---- 
- 
+      // --- 100ms has passed ---- this part needs 4ms for calculation... 
+      digitalWrite(13, 1);
       if ( timeState >= 3 ) {
         // ----  action at midnight: fill the history --------------------------
 
@@ -172,7 +178,7 @@ void loop(){
         storeEEprom();       
       }       
       
-      float kwh = storage.daysWh[0] / 1000.0;
+      float kwh = storage.daysWh[tmh.getDow(0)] / 1000.0;
       //float temp = 0.1105 * adValue + 0.583;
       //lcd.print("" + String(adValue) + "  t=" + String(temp) + "\xdf"+"C       ");
 
@@ -186,7 +192,7 @@ void loop(){
         lcd.setCursor(0,0);
         lcd.print(leftFill(String(power), 4, " ") + "W  " + leftFill(String(kwh, 3), 6, " ") + "kWh");
         lcd.setCursor(0,1);
-        lcd.print(String("39.2") + "\xdf" + "C  " + tmh.getDowName(0) + " " + tmh.getHrsMinSec());
+        lcd.print(String("39.2") + "\xdf" + "C  " +  tmh.getDowName(0) + " " + tmh.getHrsMinSec());
       }
       
       else {
@@ -199,7 +205,7 @@ void loop(){
             // -- display overall kWh
             lcd.clear();
             kwh = storage.totalWh / 1000.0;
-            lcd.print("Ges. : " + leftFill(String(kwh, 1), 6, " ") + "kWh");
+            lcd.print("Ges. : " + leftFill(String(kwh, 3), 6, " ") + "kWh");
           }
           else {
             // -- flipp through the history ... 
@@ -225,15 +231,16 @@ void loop(){
                 lbl1 = tmh.getMonthName(index);
                 lbl2 = tmh.getMonthName(index - 1);
                 break;
-              
+            
             }
-  
+            //Serial.println("index:" + String(index) + " lbl1: " + lbl1 + "  " + lbl2 + "  " + String(wh1));
+   
             lcd.setCursor(0,0);
             kwh = wh1 / 1000.0;
-            lcd.print(leftFill(lbl1, 3, " ") + ". : " + leftFill(String(kwh, 1), 5, " ") + "kWh");
+            lcd.print(leftFill(lbl1, 3, " ") + ".: " + leftFill(String(kwh, 3), 5, " ") + "kWh");
             lcd.setCursor(0,1);
-            kwh = wh2;
-            lcd.print(leftFill(lbl2, 3, " ") + ". : " + leftFill(String(kwh, 1), 5, " ") + "kWh");
+            kwh = wh2  / 1000.0;;
+            lcd.print(leftFill(lbl2, 3, " ") + ".: " + leftFill(String(kwh, 3), 5, " ") + "kWh");
          }
            
           if (tmh.getSecondsCounter() > resetDisplayModeSeconds ) {
@@ -242,6 +249,8 @@ void loop(){
           }
         }
       }
+            digitalWrite(13, 0);
+
     } // 100ms
  
     else {
