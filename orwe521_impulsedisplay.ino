@@ -14,8 +14,8 @@
 
 unsigned long power;
 int adValue = 1;
-byte showHistEntry = 0; 
-long resetshowHistEntrySeconds = 0;
+byte displayMode = 0; 
+long resetDisplayModeSeconds = 0;
 byte actualMonth = 0;
 
 // --- liquid crystal display driver from  ---------------------------------------------
@@ -107,8 +107,8 @@ void storeEEprom() {
 void setup()
 {
   
-  showHistEntry = 0; // 0 means actual day.
-  resetshowHistEntrySeconds = 0;
+  displayMode = 0; // 0 means actual day.
+  resetDisplayModeSeconds = 0;
   
   lcd.begin(16,2);               // initialize the lcd
   lcd.home();                   // go home  
@@ -163,8 +163,9 @@ void loop(){
       if ( timeState >= 3 ) {
         // ----  action at midnight: fill the history --------------------------
 
-        Serial.println("New day: " + String(tmh.getDowName()) + " yesterday: " + String(storage.daysWh[tmh.getDow(-1)]) + "Wh" );
+        Serial.println("New day: " + String(tmh.getDowName(0)) + " yesterday: " + String(storage.daysWh[tmh.getDow(-1)]) + "Wh" );
         if ( actualMonth != tmh.getMonth(0) ) {
+          // new month has started... so reset the actual counter 
           storage.monthsWh[tmh.getMonth(0)] = 0;
         }
         
@@ -177,56 +178,68 @@ void loop(){
 
 
       // ---- refresh display ----------------------------------------------------------------------------
-      if ( showHistEntry == 0 ) {
+
+      
+      
+      if ( displayMode == 0 ) {
         // -- display normal information 
         lcd.setCursor(0,0);
         lcd.print(leftFill(String(power), 4, " ") + "W  " + leftFill(String(kwh, 3), 6, " ") + "kWh");
         lcd.setCursor(0,1);
-        lcd.print(String("39.2") + "\xdf" + "C  " + tmh.getDowName() + " " + tmh.getHrsMinSec());
+        lcd.print(String("39.2") + "\xdf" + "C  " + tmh.getDowName(0) + " " + tmh.getHrsMinSec());
       }
+      
       else {
-        if ( showHistEntry == 2 ) {
-          // -- display overall kWh
-          lcd.clear();
-          kwh = storage.totalWh / 1000.0;
-          lcd.print("Ges. : " + leftFill(String(kwh, 1), 6, " ") + "kWh");
+        if ( displayMode == 99 ) {
+          // set Time and date
+          display_setDateTime();
         }
         else {
-          // -- flipp through the history ... 
-          int index = 0;
-          String label = "";
-          unsigned long wh1 = 0;
-          unsigned long wh2 = 0;
-          
-          switch ( showHistEntry ) {
-            case 4 ... 8:
-              // days hist
-              index = showHistEntry - 3;
-              label = "Tag";
-              wh1 = storage.daysWh[index];
-              wh2 = storage.daysWh[index + 1];
-              break;
-            case 10 ... 22:
-              // months hist
-              index = showHistEntry - 9;
-              label = "Wo.";
-              wh1 = storage.monthsWh[index];
-              wh2 = storage.monthsWh[index + 1];
-              break;
-            
+          if ( displayMode == 2 ) {
+            // -- display overall kWh
+            lcd.clear();
+            kwh = storage.totalWh / 1000.0;
+            lcd.print("Ges. : " + leftFill(String(kwh, 1), 6, " ") + "kWh");
           }
-
-          lcd.setCursor(0,0);
-          kwh = wh1 / 1000.0;
-          lcd.print(label +  leftFill("-" + String(index), 3, " ") + ": " + leftFill(String(kwh, 1), 5, " ") + "kWh");
-          lcd.setCursor(0,1);
-          kwh = wh2;
-          lcd.print(label + leftFill("-" + String(index + 1), 3, " ") + ": " + leftFill(String(kwh, 1), 5, " ") + "kWh");
-        }
-         
-        if (tmh.getSecondsCounter() > resetshowHistEntrySeconds ) {
-          // fall back to standard display
-          showHistEntry = 0;
+          else {
+            // -- flipp through the history ... 
+            int index = 0;
+            unsigned long wh1 = 0;
+            unsigned long wh2 = 0;
+            String lbl1; 
+            String lbl2;
+            switch ( displayMode ) {
+              case 4 ... 8:
+                // days hist
+                index = - (displayMode - 3);
+                wh1 = storage.daysWh[tmh.getDow(index)];
+                wh2 = storage.daysWh[tmh.getDow(index -1)];
+                lbl1 = tmh.getDowName(index);
+                lbl2 = tmh.getDowName(index - 1);
+                break;
+              case 10 ... 22:
+                // months hist
+                index = - (displayMode - 9);
+                wh1 = storage.monthsWh[tmh.getMonth(index)];
+                wh2 = storage.monthsWh[tmh.getMonth(index - 1)];
+                lbl1 = tmh.getMonthName(index);
+                lbl2 = tmh.getMonthName(index - 1);
+                break;
+              
+            }
+  
+            lcd.setCursor(0,0);
+            kwh = wh1 / 1000.0;
+            lcd.print(leftFill(lbl1, 3, " ") + ". : " + leftFill(String(kwh, 1), 5, " ") + "kWh");
+            lcd.setCursor(0,1);
+            kwh = wh2;
+            lcd.print(leftFill(lbl2, 3, " ") + ". : " + leftFill(String(kwh, 1), 5, " ") + "kWh");
+         }
+           
+          if (tmh.getSecondsCounter() > resetDisplayModeSeconds ) {
+            // fall back to standard display
+            displayMode = 0;
+          }
         }
       }
     } // 100ms
@@ -237,19 +250,25 @@ void loop(){
     
     // ---- deal with an eventually pressed key -----------------------
     kbdValue = kbd.read();
-    if (kbdValue != 255) //key is pressed
-        {
-            switch (kbdValue)
+    
+    if (displayMode == 99) {
+      // if its 99 (set date time) then check value in subroutine... 
+      handleKeystroke_setDateTime();
+    }
+
+    else {
+      if (kbdValue != 255) { //key is pressed
+          switch (kbdValue)
             {
             case 0:
                 storeEEprom();
                 break;
             case 1:
-                showHistEntry += 2;
-                if ( showHistEntry > 20 ) {
-                  showHistEntry = 0;
+                displayMode += 2;
+                if ( displayMode > 20 ) {
+                  displayMode = 0;
                 }
-                resetshowHistEntrySeconds = tmh.getSecondsCounter() + 5;
+                resetDisplayModeSeconds = tmh.getSecondsCounter() + 5;
                 break;
             case 2:
                 tmh.incrementDayCounter(1);
@@ -273,4 +292,6 @@ void loop(){
                 break;
             }
          }
+      }
+
   }
