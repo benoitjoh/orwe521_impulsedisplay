@@ -8,6 +8,9 @@
  * 
  * next impulse the mean power can be calculated as 3600 / secs
  */
+#define USE_STANDARD_LCD_LIBRARY 1
+//#define ENABLE_DEBUG_SERIAL 1
+
 
 #define ANALOG_TEMPSENSOR_PIN 1
 #define SIGNAL_PIN 4
@@ -19,6 +22,7 @@
 #define KEY_DOWN  2
 
 
+
 unsigned long power;
 int adValue = 1;
 byte displayMode = 0; 
@@ -26,9 +30,8 @@ long resetDisplayModeSeconds = 0;
 byte actualMonth = 0;
 
 // --- liquid crystal display driver from  ---------------------------------------------
-#define USE_STANDARD_LCD 1
 
-#ifdef USE_STANDARD_LCD
+#ifdef USE_STANDARD_LCD_LIBRARY
   // using the standard LCD Library
   #include <LiquidCrystal.h>
   //            lcd(rs, en, d4, d5, d6, d7); backlight: pin D6
@@ -45,7 +48,7 @@ byte actualMonth = 0;
   void setBacklight(byte state) {
     lcd.setBacklight(state);
   }
-#endif // USE_STANDARD_LCD
+#endif // USE_STANDARD_LCD_LIBRARY
 
 
 // --- keyboard driver from AnalogKbd.cpp ---------------------------------------------
@@ -141,12 +144,14 @@ void setup()
   pinMode(SIGNAL_PIN, INPUT);
   pinMode(13, OUTPUT);
   
+#ifdef ENABLE_DEBUG_SERIAL
   // serial device for debugging purpose!
   Serial.begin(9600);
   while (!Serial)
   {
       ; // wait for serial Pin to connect. otherwise reset if serial console is started :-/
   }
+#endif
 
 }
 
@@ -161,22 +166,23 @@ void loop(){
     unsigned long timeDeltaMillis = getStableSignalDelta(SIGNAL_PIN);
     if ( timeDeltaMillis > 0 ) {
       // one impulse received means 1 Wh was comsumed. time passed since last impulse --> power
+      digitalWrite(13, 1);
       
       storage.daysWh[tmh.getDow(0)]++;
       storage.monthsWh[tmh.getMonth(0)]++;
       storage.totalWh++;
       power = 3600000 / timeDeltaMillis; 
+      delay(10);
+      digitalWrite(13, 0);
     }
    
     byte timeState = tmh.actualize(); // update the timeloop handler. state: 0: nothing; 1: 100ms passed; 2: 1s passed; 3: midnight
 
     if ( timeState >= 1 ) {
       // --- 100ms has passed ---- this part needs 4ms for calculation... 
-      digitalWrite(13, 1);
       if ( timeState >= 3 ) {
         // ----  action at midnight: fill the history --------------------------
 
-        Serial.println("New day: " + String(tmh.getDowName(0)) + " yesterday: " + String(storage.daysWh[tmh.getDow(-1)]) + "Wh" );
         if ( actualMonth != tmh.getMonth(0) ) {
           // new month has started... so reset the actual counter 
           storage.monthsWh[tmh.getMonth(0)] = 0;
@@ -198,7 +204,7 @@ void loop(){
       if ( displayMode == 0 ) {
         // -- display normal information 
         lcd.setCursor(0,0);
-        lcd.print(leftFill(String(power), 4, "    ") + "W  " + leftFill(String(kwh, 2), 5, " ") + "kWh");
+        lcd.print(leftFill(String(power), 4, " ") + "W   " + leftFill(String(kwh, 2), 5, " ") + "kWh");
         lcd.setCursor(0,1);
         lcd.print(String("39.2") + "\xdf" + "C  " +  tmh.getDowName(0) + " " + tmh.getHrsMinSec());
       }
@@ -257,7 +263,7 @@ void loop(){
           }
         }
       }
-            digitalWrite(13, 0);
+            
 
     } // 100ms
  
