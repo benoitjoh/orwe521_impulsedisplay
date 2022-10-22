@@ -1,17 +1,21 @@
 
-byte setIdx = 0;
-const byte cursPos[5] = {1, 4, 9, 12, 15};
+
+#define SETTIME_KEY_ENTER 20
+#define SETTIME_KEY_RIGHT 21 
+#define SETTIME_KEY_LEFT  22
+#define SETTIME_KEY_UP    23
+#define SETTIME_KEY_DOWN  24
+
+
+byte settingIdx = 1;
+const byte cursPos[6] = {0, 1, 4, 9, 12, 15};
 bool setInitialized = false;
 bool refresh = true;
-bool isActiveSetTime = false; 
 
 void start_setDateTime() {
-  isActiveSetTime = true; 
+  displayMode = 99; 
 }
 
-void end_setDateTime() {
-  isActiveSetTime = false; 
-}
 
 void display_setDateTime() {
   if (!setInitialized) {
@@ -25,21 +29,77 @@ void display_setDateTime() {
     /// pos        1  4    9  c  f
     /// show     "dd.mm.yyyy hh:mm" the :ss is cut of
     lcd.print(tmh.getDayMonYear()+ " " + tmh.getHrsMinSec());
-    lcd.setCursor(cursPos[setIdx], 1);
+    lcd.setCursor(cursPos[settingIdx], 1);
+    refresh = false;
+
   }
 }
 
 void handleKeystroke_setDateTime() {
-  
+  refresh = true;
   switch (kbdValue) 
     {
-    case 128:   // 0 long
+    case SETTIME_KEY_ENTER:   // enter (key 0 in set date time mode
       // finish
-      lcd.setCursor(0,1);
-      lcd.print("saved  ...  ");
-      delay(200);
+      displayMode = 0;
+      kbdValue = 255; 
+      lcd.clear(); 
+      lcd.home();
+      lcd.print("saved...");
+      lcd.noCursor();
+      lcd.noBlink();
+
+      storeEEprom();
+      delay(1000); 
       break;
-      
+    case SETTIME_KEY_RIGHT: // right (key 1 in set date time mode
+        settingIdx++;
+        if (settingIdx > 5) { settingIdx = 1; }
+        break;
+    case SETTIME_KEY_LEFT: // left (key 2 in set date time mode
+        settingIdx--;
+        if (settingIdx < 1) { settingIdx = 5; }
+        break;
+    case SETTIME_KEY_UP: // up 
+        switch (settingIdx) {
+            case 1: //day
+                tmh.incrementDayCounter(1);
+                break;
+            case 2: //day
+                tmh.incrementMonth();
+                break;
+            case 3: //day
+                tmh.incrementYear();
+                break;
+            case 4: //day
+                tmh.incrementSecondsCounter(3600);
+                break;
+            case 5: //day
+                tmh.incrementSecondsCounter(60);
+                break;
+        }
+        break;
+    case SETTIME_KEY_DOWN: // down 
+        switch (settingIdx) {
+            case 1: //day
+                tmh.incrementDayCounter(-1);
+                break;
+            case 2: //day
+                tmh.decrementMonth();
+                break;
+            case 3: //day
+                tmh.decrementYear();
+                break;
+            case 4: //day
+                tmh.incrementSecondsCounter(-3600);
+                break;
+            case 5: //day
+                tmh.incrementSecondsCounter(-60);
+                break;
+        }
+        break;
+                    
+                    
     default:
       break;
     

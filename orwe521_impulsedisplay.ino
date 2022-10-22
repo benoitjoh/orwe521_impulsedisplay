@@ -174,7 +174,8 @@ void loop(){
           // new month has started... so reset the actual counter 
           storage.monthsWh[tmh.getMonth(0)] = 0;
         }
-        
+        //reset the new wh counter for the new day
+        storage.daysWh[tmh.getDow(0)] = 0; 
         storeEEprom();       
       }       
       
@@ -190,7 +191,7 @@ void loop(){
       if ( displayMode == 0 ) {
         // -- display normal information 
         lcd.setCursor(0,0);
-        lcd.print(leftFill(String(power), 4, " ") + "W  " + leftFill(String(kwh, 3), 6, " ") + "kWh");
+        lcd.print(leftFill(String(power), 4, "  ") + "W  " + leftFill(String(kwh, 2), 6, " ") + "kWh");
         lcd.setCursor(0,1);
         lcd.print(String("39.2") + "\xdf" + "C  " +  tmh.getDowName(0) + " " + tmh.getHrsMinSec());
       }
@@ -205,7 +206,7 @@ void loop(){
             // -- display overall kWh
             lcd.clear();
             kwh = storage.totalWh / 1000.0;
-            lcd.print("Ges. : " + leftFill(String(kwh, 3), 6, " ") + "kWh");
+            lcd.print("Ges. :  " + leftFill(String(kwh, 2), 6, " ") + "kWh");
           }
           else {
             // -- flipp through the history ... 
@@ -225,7 +226,7 @@ void loop(){
                 break;
               case 10 ... 22:
                 // months hist
-                index = - (displayMode - 9);
+                index = - (displayMode - 10);
                 wh1 = storage.monthsWh[tmh.getMonth(index)];
                 wh2 = storage.monthsWh[tmh.getMonth(index - 1)];
                 lbl1 = tmh.getMonthName(index);
@@ -237,10 +238,10 @@ void loop(){
    
             lcd.setCursor(0,0);
             kwh = wh1 / 1000.0;
-            lcd.print(leftFill(lbl1, 3, " ") + ".: " + leftFill(String(kwh, 3), 5, " ") + "kWh");
+            lcd.print(leftFill(lbl1, 3, " ") + ".:  " + leftFill(String(kwh, 2), 6, " ") + "kWh");
             lcd.setCursor(0,1);
             kwh = wh2  / 1000.0;;
-            lcd.print(leftFill(lbl2, 3, " ") + ".: " + leftFill(String(kwh, 3), 5, " ") + "kWh");
+            lcd.print(leftFill(lbl2, 3, " ") + ".:  " + leftFill(String(kwh, 2), 6, " ") + "kWh");
          }
            
           if (tmh.getSecondsCounter() > resetDisplayModeSeconds ) {
@@ -259,48 +260,42 @@ void loop(){
     
     // ---- deal with an eventually pressed key -----------------------
     kbdValue = kbd.read();
-    
-    if (displayMode == 99) {
-      // if its 99 (set date time) then check value in subroutine... 
-      handleKeystroke_setDateTime();
-    }
+      
+     if (kbdValue != 255) { //key is pressed
+        if (displayMode == 99) {
+          // if its 99 (set date time) then keys for set date time is aktive
+          // keys 0, 1, 2, 3, 4 as 20, 21, 22, 23 ,24 
+          kbdValue += 20;
+        }
+        switch (kbdValue)
+          {
+          case 0:
+              storeEEprom();
+              break;
+          case 1:
+              displayMode += 2;
+              if ( displayMode > 20 ) {
+                displayMode = 0;
+              }
+              resetDisplayModeSeconds = tmh.getSecondsCounter() + 5;
+              break;
+          case 4:
+              tmh.incrementSecondsCounter(60);
+              break;
+          case 3:
+              tmh.incrementSecondsCounter(-60);
+              break;
+              
+          case 128:  // key 0 long
+              start_setDateTime();
+              break;
 
-    else {
-      if (kbdValue != 255) { //key is pressed
-          switch (kbdValue)
-            {
-            case 0:
-                storeEEprom();
-                break;
-            case 1:
-                displayMode += 2;
-                if ( displayMode > 20 ) {
-                  displayMode = 0;
-                }
-                resetDisplayModeSeconds = tmh.getSecondsCounter() + 5;
-                break;
-            case 2:
-                tmh.incrementDayCounter(1);
-                break;
-            case 3:
-                tmh.incrementSecondsCounter(3600);
-                break;
-            case 4:
-                tmh.incrementSecondsCounter(60);
-                break;
-            case 130:  // key 2 long
-                tmh.incrementDayCounter(-1);
-                break;
-            case 131: // key 3 long
-                tmh.incrementSecondsCounter(-3600);
-                break;
-            case 132: // key 4 long
-                tmh.incrementSecondsCounter(-60);
-                break;
-            default:
-                break;
-            }
-         }
-      }
-
+          case 20 ... 24: //enter
+              handleKeystroke_setDateTime();
+              break;
+              
+          default:
+              break;
+          }
+       }
   }
