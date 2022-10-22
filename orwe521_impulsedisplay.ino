@@ -10,7 +10,14 @@
  */
 
 #define ANALOG_TEMPSENSOR_PIN 1
-#define SIGNAL_PIN 2
+#define SIGNAL_PIN 4
+
+#define KEY_ENTER 0
+#define KEY_RIGHT 1 
+#define KEY_LEFT  4
+#define KEY_UP    3
+#define KEY_DOWN  2
+
 
 unsigned long power;
 int adValue = 1;
@@ -19,7 +26,7 @@ long resetDisplayModeSeconds = 0;
 byte actualMonth = 0;
 
 // --- liquid crystal display driver from  ---------------------------------------------
-//#define USE_STANDARD_LCD 1
+#define USE_STANDARD_LCD 1
 
 #ifdef USE_STANDARD_LCD
   // using the standard LCD Library
@@ -191,7 +198,7 @@ void loop(){
       if ( displayMode == 0 ) {
         // -- display normal information 
         lcd.setCursor(0,0);
-        lcd.print(leftFill(String(power), 4, "  ") + "W  " + leftFill(String(kwh, 2), 6, " ") + "kWh");
+        lcd.print(leftFill(String(power), 4, "    ") + "W  " + leftFill(String(kwh, 2), 5, " ") + "kWh");
         lcd.setCursor(0,1);
         lcd.print(String("39.2") + "\xdf" + "C  " +  tmh.getDowName(0) + " " + tmh.getHrsMinSec());
       }
@@ -206,7 +213,7 @@ void loop(){
             // -- display overall kWh
             lcd.clear();
             kwh = storage.totalWh / 1000.0;
-            lcd.print("Ges. :  " + leftFill(String(kwh, 2), 6, " ") + "kWh");
+            lcd.print("Ges.: " + leftFill(String(kwh, 1), 7, " ") + "kWh");
           }
           else {
             // -- flipp through the history ... 
@@ -238,10 +245,10 @@ void loop(){
    
             lcd.setCursor(0,0);
             kwh = wh1 / 1000.0;
-            lcd.print(leftFill(lbl1, 3, " ") + ".:  " + leftFill(String(kwh, 2), 6, " ") + "kWh");
+            lcd.print(leftFill(lbl1, 3, " ") + ".:  " + leftFill(String(kwh, 1), 6, " ") + "kWh");
             lcd.setCursor(0,1);
             kwh = wh2  / 1000.0;;
-            lcd.print(leftFill(lbl2, 3, " ") + ".:  " + leftFill(String(kwh, 2), 6, " ") + "kWh");
+            lcd.print(leftFill(lbl2, 3, " ") + ".:  " + leftFill(String(kwh, 1), 6, " ") + "kWh");
          }
            
           if (tmh.getSecondsCounter() > resetDisplayModeSeconds ) {
@@ -269,24 +276,24 @@ void loop(){
         }
         switch (kbdValue)
           {
-          case 0:
+          case KEY_ENTER:
               storeEEprom();
               break;
-          case 1:
+          case KEY_RIGHT:
               displayMode += 2;
               if ( displayMode > 20 ) {
                 displayMode = 0;
               }
               resetDisplayModeSeconds = tmh.getSecondsCounter() + 5;
               break;
-          case 4:
+          case KEY_UP:
               tmh.incrementSecondsCounter(60);
               break;
-          case 3:
+          case KEY_DOWN:
               tmh.incrementSecondsCounter(-60);
               break;
               
-          case 128:  // key 0 long
+          case 128 + KEY_ENTER:  // key 0 long
               start_setDateTime();
               break;
 

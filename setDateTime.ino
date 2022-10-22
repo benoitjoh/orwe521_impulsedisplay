@@ -2,9 +2,9 @@
 
 #define SETTIME_KEY_ENTER 20
 #define SETTIME_KEY_RIGHT 21 
-#define SETTIME_KEY_LEFT  22
+#define SETTIME_KEY_LEFT  24
 #define SETTIME_KEY_UP    23
-#define SETTIME_KEY_DOWN  24
+#define SETTIME_KEY_DOWN  22
 
 
 byte settingIdx = 1;

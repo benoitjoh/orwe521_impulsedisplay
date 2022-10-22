@@ -31,7 +31,7 @@ unsigned long getStableSignalDelta(byte pin) {
       if (!waitForValidation and !waitForReset) {
         signalMillis = actMillis;    
         waitForValidation = true;
-        Serial.println("signal candidate at: " + String(signalMillis) );
+        //Serial.println("signal candidate at: " + String(signalMillis) );
       }
        
     }
