@@ -3,8 +3,8 @@
 #define SETTIME_KEY_ENTER 20
 #define SETTIME_KEY_RIGHT 21 
 #define SETTIME_KEY_LEFT  24
-#define SETTIME_KEY_UP    23
-#define SETTIME_KEY_DOWN  22
+#define SETTIME_KEY_UP    22
+#define SETTIME_KEY_DOWN  23
 
 
 byte settingIdx = 1;
@@ -23,8 +23,9 @@ void display_setDateTime() {
     lcd.blink();
   }
   if (refresh) {
+    lcd.clear();
     lcd.setCursor(0,0);
-    lcd.print("Set date ...  " +  tmh.getDowName(0)) ;
+    lcd.print("Set time      " +  tmh.getDowName(0)) ;
     lcd.setCursor(0,1);
     /// pos        1  4    9  c  f
     /// show     "dd.mm.yyyy hh:mm" the :ss is cut of
@@ -43,15 +44,11 @@ void handleKeystroke_setDateTime() {
       // finish
       displayMode = 0;
       kbdValue = 255; 
-      lcd.clear(); 
-      lcd.home();
-      lcd.print("saved...");
       lcd.noCursor();
       lcd.noBlink();
 
       storeEEprom();
-      delay(1000); 
-      break;
+       break;
     case SETTIME_KEY_RIGHT: // right (key 1 in set date time mode
         settingIdx++;
         if (settingIdx > 5) { settingIdx = 1; }

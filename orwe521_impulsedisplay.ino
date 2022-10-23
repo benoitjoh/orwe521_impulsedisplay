@@ -24,7 +24,7 @@
 
 
 unsigned long power;
-int adValue = 1;
+int temp = 0;
 byte displayMode = 0; 
 long resetDisplayModeSeconds = 0;
 byte actualMonth = 0;
@@ -111,9 +111,13 @@ void storeEEprom() {
   storage.dayCounter = tmh.getDayCounter();
   EEPROM_writeAnything(EE_OFFSET, storage);
   lcd.setCursor(0,1);
-  lcd.print("data stored. ");
-  delay(1000);
+  lcd.print("data saved. ");
+  delay(500);
 }
+
+
+
+
 // ------------------------------------------------------------------------------------------
 
 
@@ -172,7 +176,7 @@ void loop(){
       storage.monthsWh[tmh.getMonth(0)]++;
       storage.totalWh++;
       power = 3600000 / timeDeltaMillis; 
-      delay(10);
+      delay(5);
       digitalWrite(13, 0);
     }
    
@@ -180,6 +184,13 @@ void loop(){
 
     if ( timeState >= 1 ) {
       // --- 100ms has passed ---- this part needs 4ms for calculation... 
+ 
+      if ( timeState >= 2 ) {
+        // --- 1sec has passed ---- 
+        temp = read_pt1000(analogRead(ANALOG_TEMPSENSOR_PIN));
+        }     
+
+      PORTB |=  B00100000; //set pin13 to HIGH      
       if ( timeState >= 3 ) {
         // ----  action at midnight: fill the history --------------------------
 
@@ -195,6 +206,8 @@ void loop(){
       float kwh = storage.daysWh[tmh.getDow(0)] / 1000.0;
       //float temp = 0.1105 * adValue + 0.583;
       //lcd.print("" + String(adValue) + "  t=" + String(temp) + "\xdf"+"C       ");
+      
+      PORTB &= ~B00100000; //set pin13 to LOW 
 
 
       // ---- refresh display ----------------------------------------------------------------------------
@@ -206,7 +219,7 @@ void loop(){
         lcd.setCursor(0,0);
         lcd.print(leftFill(String(power), 4, " ") + "W   " + leftFill(String(kwh, 2), 5, " ") + "kWh");
         lcd.setCursor(0,1);
-        lcd.print(String("39.2") + "\xdf" + "C  " +  tmh.getDowName(0) + " " + tmh.getHrsMinSec());
+        lcd.print("  " + String(temp) + "\xdf" + "C  " +  tmh.getDowName(0) + " " + tmh.getHrsMinSec());
       }
       
       else {
@@ -264,8 +277,7 @@ void loop(){
         }
       }
             
-
-    } // 100ms
+     } // 100ms
  
     else {
       delay(1); //minimum loop time if nothing else happened...       
