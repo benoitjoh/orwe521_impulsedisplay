@@ -18,9 +18,8 @@
 #define KEY_ENTER 0
 #define KEY_RIGHT 1 
 #define KEY_LEFT  4
-#define KEY_UP    3
-#define KEY_DOWN  2
-
+#define KEY_UP    2
+#define KEY_DOWN  3
 
 
 unsigned long power;
@@ -161,6 +160,7 @@ void setup()
 
 
 // Mainloop ---------------------------------------------------------------------------
+unsigned long lastMeasurement = 0;
 
 void loop(){
     actualMonth = tmh.getMonth(0);
@@ -176,9 +176,11 @@ void loop(){
       storage.monthsWh[tmh.getMonth(0)]++;
       storage.totalWh++;
       power = 3600000 / timeDeltaMillis; 
+      lastMeasurement = millis();
       delay(5);
       digitalWrite(13, 0);
     }
+    
    
     byte timeState = tmh.actualize(); // update the timeloop handler. state: 0: nothing; 1: 100ms passed; 2: 1s passed; 3: midnight
 
@@ -186,11 +188,21 @@ void loop(){
       // --- 100ms has passed ---- this part needs 4ms for calculation... 
  
       if ( timeState >= 2 ) {
-        // --- 1sec has passed ---- 
+        // --- 1 sec has passed ---- 
+
+        // correction if for a long time no impulse was received.
+        unsigned long actMillis = millis();
+        unsigned long passedMillis = actMillis - lastMeasurement;
+        if ( passedMillis > 720000 and power > 0){
+          timeDeltaMillis = passedMillis;
+          lastMeasurement = actMillis; 
+          power = 0; 
+        }
+        
+        PORTB |=  B00100000; //set pin13 to HIGH      
         temp = read_pt1000(analogRead(ANALOG_TEMPSENSOR_PIN));
         }     
 
-      PORTB |=  B00100000; //set pin13 to HIGH      
       if ( timeState >= 3 ) {
         // ----  action at midnight: fill the history --------------------------
 
