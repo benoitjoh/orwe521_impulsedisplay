@@ -54,10 +54,8 @@ byte actualMonth = 0;
 #include<AnalogKbd.h>
 #define PIN_ANALOG_KBD   0  // ad0 for input of analog Keyboard...
 #define KBD_NR_OF_KEYS   5  // how many keys are built up in the circuit
-#define KBD_RELIABLE_TIME_DELTA     30   // ms a key must be pressed
-#define KBD_LONGPRESS_TIME_DELTA    600  // ms a key must be pressed for long value
 
-AnalogKbd kbd(PIN_ANALOG_KBD, KBD_NR_OF_KEYS, KBD_RELIABLE_TIME_DELTA, KBD_LONGPRESS_TIME_DELTA);
+AnalogKbd kbd(PIN_ANALOG_KBD, KBD_NR_OF_KEYS);
 byte kbdValue = 255; //the value that is read from keyboard 255 is neutral value
 
 
