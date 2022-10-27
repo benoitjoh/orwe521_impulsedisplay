@@ -6,7 +6,7 @@
 
 
 // a signal must remain for at least some millisecs
-#define MIN_SIGNAL_PERIOD 70
+#define MIN_SIGNAL_PERIOD 50
 
 unsigned long actMillis;
 unsigned long signalMillis = 0;

@@ -168,7 +168,7 @@ void loop(){
     unsigned long timeDeltaMillis = getStableSignalDelta(SIGNAL_PIN);
     if ( timeDeltaMillis > 0 ) {
       // one impulse received means 1 Wh was comsumed. time passed since last impulse --> power
-      digitalWrite(13, 1);
+      PORTB |=  B00100000; //set pin13 to HIGH      
       
       storage.daysWh[tmh.getDow(0)]++;
       storage.monthsWh[tmh.getMonth(0)]++;
@@ -176,7 +176,8 @@ void loop(){
       power = 3600000 / timeDeltaMillis; 
       lastMeasurement = millis();
       delay(5);
-      digitalWrite(13, 0);
+      
+      PORTB &= ~B00100000; //set pin13 to LOW 
     }
     
    
@@ -229,7 +230,7 @@ void loop(){
         lcd.setCursor(0,0);
         lcd.print(leftFill(String(power), 4, " ") + "W   " + leftFill(String(kwh, 2), 5, " ") + "kWh");
         lcd.setCursor(0,1);
-        lcd.print("  " + String(temp) + "\xdf" + "C  " +  tmh.getDowName(0) + " " + tmh.getHrsMinSec());
+        lcd.print(leftFill(String(temp), 4, " ") + "\xdf" + "C  " +  tmh.getDowName(0) + " " + tmh.getHrsMinSec());
       }
       
       else {
