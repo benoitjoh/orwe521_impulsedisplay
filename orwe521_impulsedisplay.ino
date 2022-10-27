@@ -7,13 +7,21 @@
  * to exclude noise
  * 
  * next impulse the mean power can be calculated as 3600 / secs
+ * 
+ * note: all data in storage are stored in deci-Wh (means a 10 = 1Wh)
+ * 
  */
-#define USE_STANDARD_LCD_LIBRARY 1
+//#define USE_STANDARD_LCD_LIBRARY 1
 //#define ENABLE_DEBUG_SERIAL 1
 
 
 #define ANALOG_TEMPSENSOR_PIN 1
+
 #define SIGNAL_PIN 4
+
+#define ORWE_PULSE_PER_KWH 800
+#define ORWE_DECIWH_PER_PULSE ( 10000 / ORWE_PULSE_PER_KWH )
+
 
 #define KEY_ENTER 0
 #define KEY_RIGHT 1 
@@ -82,20 +90,37 @@ struct {
     long secondsCounter = 70000;
     long dayCounter = 100;
     unsigned long totalWh = 0;
-    unsigned long daysWh[7] = {0, 1, 2, 3, 4, 5, 6}; // monday = 0 
-    unsigned long monthsWh[13] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 ,12}; // jan = 1, dec = 12
+    unsigned long daysWh[7] = {0, 0, 0, 0, 0, 0, 0}; // monday = 0 
+    unsigned long monthsWh[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ,0}; // jan = 1, dec = 12
+    int version = 1;
 } storage;
 
+//void migrateData() {
+//  //optional method to lift data model from one version to anothera 
+//  storage.totalWh *= 10;
+//  storage.version = 2;
+//  for (int i=0; i<7; i++) { storage.daysWh[i] *= 10; }
+//  for (int i=0; i<13; i++) { storage.monthsWh[i] *= 10; }
+//  
+//  storage.monthsWh[10] = 126400;
+//  storage.totalWh = 126400;
+//}
 
 void loadEEprom(bool reset) {
   lcd.setCursor(0,1);
   if (!reset) {
     EEPROM_readAnything(EE_OFFSET, storage);
     lcd.print("data loaded.     ");
+//    if ( storage.version != 2 ) {
+//      migrateData();
+//  }
   }
   else {
     lcd.print("EEPROM reset.     ");
+    delay(500);
   }
+  
+  
   tmh.setSecondsCounter(storage.secondsCounter);
   tmh.setDayCounter(storage.dayCounter);
   
@@ -126,18 +151,24 @@ void setup()
   
   displayMode = 0; // 0 means actual day.
   resetDisplayModeSeconds = 0;
-  
+
   lcd.begin(16,2);               // initialize the lcd
   lcd.home();                   // go home  
-  setBacklight(1);
-  lcd.print("   OR-WE-521");
-  lcd.setCursor(0,1);
-  lcd.print(" impuls counter");
-  delay(1000);
-  
+  lcd.print("  OR-WE-521 "); 
+  delay(500);
+   
   // if no key is pressed on start, read values from eeprom, else reset
   loadEEprom( bool(analogRead(PIN_ANALOG_KBD) > 100) );
   
+  setBacklight(1);
+
+  lcd.setCursor(0,1);
+  lcd.print(" imp cntr (v." + String(storage.version) + ")");
+  delay(2000);
+  lcd.home();                   // go home  
+  lcd.print("deciWh/pulse " + String(ORWE_DECIWH_PER_PULSE));
+  delay(2000);
+   
   lcd.noCursor();
   lcd.clear();
 
@@ -169,11 +200,12 @@ void loop(){
     if ( timeDeltaMillis > 0 ) {
       // one impulse received means 1 Wh was comsumed. time passed since last impulse --> power
       PORTB |=  B00100000; //set pin13 to HIGH      
+
       
-      storage.daysWh[tmh.getDow(0)]++;
-      storage.monthsWh[tmh.getMonth(0)]++;
-      storage.totalWh++;
-      power = 3600000 / timeDeltaMillis; 
+      storage.daysWh[tmh.getDow(0)] += ORWE_DECIWH_PER_PULSE;
+      storage.monthsWh[tmh.getMonth(0)] += ORWE_DECIWH_PER_PULSE;
+      storage.totalWh += ORWE_DECIWH_PER_PULSE;
+      power = 360000 * ORWE_DECIWH_PER_PULSE / timeDeltaMillis; 
       lastMeasurement = millis();
       delay(5);
       
@@ -214,7 +246,7 @@ void loop(){
         storeEEprom();       
       }       
       
-      float kwh = storage.daysWh[tmh.getDow(0)] / 1000.0;
+      float kwh = storage.daysWh[tmh.getDow(0)] / 10000.0;
       //float temp = 0.1105 * adValue + 0.583;
       //lcd.print("" + String(adValue) + "  t=" + String(temp) + "\xdf"+"C       ");
       
@@ -242,7 +274,7 @@ void loop(){
           if ( displayMode == 2 ) {
             // -- display overall kWh
             lcd.clear();
-            kwh = storage.totalWh / 1000.0;
+            kwh = storage.totalWh / 10000.0;
             lcd.print("Ges.: " + leftFill(String(kwh, 1), 7, " ") + "kWh");
           }
           else {
@@ -274,10 +306,10 @@ void loop(){
             //Serial.println("index:" + String(index) + " lbl1: " + lbl1 + "  " + lbl2 + "  " + String(wh1));
    
             lcd.setCursor(0,0);
-            kwh = wh1 / 1000.0;
+            kwh = wh1 / 10000.0;
             lcd.print(leftFill(lbl1, 3, " ") + ".:  " + leftFill(String(kwh, 1), 6, " ") + "kWh");
             lcd.setCursor(0,1);
-            kwh = wh2  / 1000.0;;
+            kwh = wh2  / 10000.0;;
             lcd.print(leftFill(lbl2, 3, " ") + ".:  " + leftFill(String(kwh, 1), 6, " ") + "kWh");
          }
            
