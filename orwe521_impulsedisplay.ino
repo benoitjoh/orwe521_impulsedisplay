@@ -11,23 +11,12 @@
  * note: all data in storage are stored in deci-Wh (means a 10 = 1Wh)
  * 
  */
-//#define USE_STANDARD_LCD_LIBRARY 1
-//#define ENABLE_DEBUG_SERIAL 1
+
+#include "config.h"
 
 
-#define ANALOG_TEMPSENSOR_PIN 1
-
-#define SIGNAL_PIN 4
-
-#define ORWE_PULSE_PER_KWH 800
+#define ORWE_PULSE_PER_KWH 1000
 #define ORWE_DECIWH_PER_PULSE ( 10000 / ORWE_PULSE_PER_KWH )
-
-
-#define KEY_ENTER 0
-#define KEY_RIGHT 1 
-#define KEY_LEFT  4
-#define KEY_UP    2
-#define KEY_DOWN  3
 
 
 unsigned long power;
@@ -36,13 +25,13 @@ byte displayMode = 0;
 long resetDisplayModeSeconds = 0;
 byte actualMonth = 0;
 
-// --- liquid crystal display driver from  ---------------------------------------------
+// --- liquid crystal display driver from LiquidCrystal.h or LiquidCrystal_SR2W.h ---------------------------------------------
 
 #ifdef USE_STANDARD_LCD_LIBRARY
   // using the standard LCD Library
   #include <LiquidCrystal.h>
-  //            lcd(rs, en, d4, d5, d6, d7); backlight: pin D6
-  LiquidCrystal lcd(8,  7,   9, 10, 11, 12);
+  //            lcd(rs, e, d4, d5, d6, d7); backlight: pin D6
+  LiquidCrystal lcd(LDC_RS,  LDC_E,   LDC_D4, LDC_D5, LDC_D6, LDC_D7);
   
   void setBacklight(byte state) {
     digitalWrite(6, state);
@@ -50,7 +39,7 @@ byte actualMonth = 0;
 #else
   // using the latchregister
   #include <LiquidCrystal_SR2W.h>
-  LiquidCrystal_SR2W lcd(8, 7, POSITIVE);
+  LiquidCrystal_SR2W lcd(LDC_DATA, LDC_CLOCK, POSITIVE);
 
   void setBacklight(byte state) {
     lcd.setBacklight(state);
@@ -60,8 +49,6 @@ byte actualMonth = 0;
 
 // --- keyboard driver from AnalogKbd.cpp ---------------------------------------------
 #include<AnalogKbd.h>
-#define PIN_ANALOG_KBD   0  // ad0 for input of analog Keyboard...
-#define KBD_NR_OF_KEYS   5  // how many keys are built up in the circuit
 
 AnalogKbd kbd(PIN_ANALOG_KBD, KBD_NR_OF_KEYS);
 byte kbdValue = 255; //the value that is read from keyboard 255 is neutral value
@@ -83,9 +70,8 @@ String leftFill(String a, byte wantedLen, String fillLetter)
 }
 
 
-// --- Variables that will be stored in eeprom if system goes power off --------------------- 
+// --- Variables that will be stored in eeprom persistent --------------------- 
 #include "eeAny.h"
-#define EE_OFFSET 128
 struct {
     long secondsCounter = 70000;
     long dayCounter = 100;
@@ -96,7 +82,7 @@ struct {
 } storage;
 
 //void migrateData() {
-//  //optional method to lift data model from one version to anothera 
+//  //optional method to lift data model from one version to another 
 //  storage.totalWh *= 10;
 //  storage.version = 2;
 //  for (int i=0; i<7; i++) { storage.daysWh[i] *= 10; }
@@ -176,14 +162,12 @@ void setup()
   pinMode(SIGNAL_PIN, INPUT);
   pinMode(13, OUTPUT);
   
-#ifdef ENABLE_DEBUG_SERIAL
   // serial device for debugging purpose!
   Serial.begin(9600);
   while (!Serial)
   {
       ; // wait for serial Pin to connect. otherwise reset if serial console is started :-/
   }
-#endif
 
 }
 
@@ -275,7 +259,7 @@ void loop(){
             // -- display overall kWh
             lcd.clear();
             kwh = storage.totalWh / 10000.0;
-            lcd.print("Ges.: " + leftFill(String(kwh, 1), 7, " ") + "kWh");
+            lcd.print("Ges.: " + leftFill(String(kwh, 2), 7, " ") + "kWh");
           }
           else {
             // -- flipp through the history ... 
@@ -307,10 +291,10 @@ void loop(){
    
             lcd.setCursor(0,0);
             kwh = wh1 / 10000.0;
-            lcd.print(leftFill(lbl1, 3, " ") + ".:  " + leftFill(String(kwh, 1), 6, " ") + "kWh");
+            lcd.print(leftFill(lbl1, 3, " ") + ".:  " + leftFill(String(kwh, 2), 6, " ") + "kWh");
             lcd.setCursor(0,1);
             kwh = wh2  / 10000.0;;
-            lcd.print(leftFill(lbl2, 3, " ") + ".:  " + leftFill(String(kwh, 1), 6, " ") + "kWh");
+            lcd.print(leftFill(lbl2, 3, " ") + ".:  " + leftFill(String(kwh, 2), 6, " ") + "kWh");
          }
            
           if (tmh.getSecondsCounter() > resetDisplayModeSeconds ) {

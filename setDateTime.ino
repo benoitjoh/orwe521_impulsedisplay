@@ -1,10 +1,12 @@
 
 
-#define SETTIME_KEY_ENTER 20
-#define SETTIME_KEY_RIGHT 21 
-#define SETTIME_KEY_LEFT  24
-#define SETTIME_KEY_UP    22
-#define SETTIME_KEY_DOWN  23
+
+
+#define SETTIME_KEY_ENTER (20 + KEY_ENTER) 
+#define SETTIME_KEY_RIGHT (20 + KEY_RIGHT)  
+#define SETTIME_KEY_LEFT  (20 + KEY_LEFT) 
+#define SETTIME_KEY_UP    (20 + KEY_UP) 
+#define SETTIME_KEY_DOWN  (20 + KEY_DOWN) 
 
 
 byte settingIdx = 1;

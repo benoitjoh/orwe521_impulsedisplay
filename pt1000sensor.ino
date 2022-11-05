@@ -14,7 +14,7 @@
  *            |          |
  *      GND --+----------+---------
  *
-//https://www.mikrocontroller.net/topic/353666
+ *  source: https://www.mikrocontroller.net/topic/353666
 */
 
 
