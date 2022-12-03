@@ -26,7 +26,7 @@
 #define R_REF             1000.0          // ext. resistor with accuracy 0.1%
 #define R_ZULEITUNG       0               // resistance for long lines
 #define PT_FAKTOR         3.85            // calibrated factor
-#define LINEAR_OFFESET    -4              // drift
+#define LINEAR_OFFESET    -3              // drift
 
 
 int read_pt1000(int adValue)           

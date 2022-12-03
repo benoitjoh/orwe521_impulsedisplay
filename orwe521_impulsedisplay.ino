@@ -13,6 +13,7 @@
  */
 
 #include "config.h"
+#define VERSION "v1.1/" __DATE__
 
 
 #define ORWE_PULSE_PER_KWH 1000
@@ -75,9 +76,9 @@ String leftFill(String a, byte wantedLen, String fillLetter)
 struct {
     long secondsCounter = 70000;
     long dayCounter = 100;
-    unsigned long totalWh = 0;
-    unsigned long daysWh[7] = {0, 0, 0, 0, 0, 0, 0}; // monday = 0 
-    unsigned long monthsWh[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ,0}; // jan = 1, dec = 12
+    unsigned long totalWh = 412100;
+    unsigned long daysWh[7] = {0, 0, 0, 0, 20000, 9700, 120}; // monday = 0 
+    unsigned long monthsWh[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 223000, 188900 ,0}; // jan = 1, dec = 12
     int version = 1;
 } storage;
 
@@ -92,10 +93,10 @@ struct {
 //  storage.totalWh = 126400;
 //}
 
-void loadEEprom(bool reset) {
+void loadEEprom(bool reset, int offset) {
   lcd.setCursor(0,1);
   if (!reset) {
-    EEPROM_readAnything(EE_OFFSET, storage);
+    EEPROM_readAnything(offset, storage);
     lcd.print("data loaded.     ");
 //    if ( storage.version != 2 ) {
 //      migrateData();
@@ -114,10 +115,10 @@ void loadEEprom(bool reset) {
   
 }
 
-void storeEEprom() {
+void storeEEprom(int offset) {
   storage.secondsCounter = tmh.getSecondsCounter();
   storage.dayCounter = tmh.getDayCounter();
-  EEPROM_writeAnything(EE_OFFSET, storage);
+  EEPROM_writeAnything(offset, storage);
   lcd.setCursor(0,1);
   lcd.print("data saved. ");
   delay(500);
@@ -140,16 +141,16 @@ void setup()
 
   lcd.begin(16,2);               // initialize the lcd
   lcd.home();                   // go home  
-  lcd.print("  OR-WE-521 "); 
+  lcd.print(" # OR-WE-521 #"); 
   delay(500);
    
   // if no key is pressed on start, read values from eeprom, else reset
-  loadEEprom( bool(analogRead(PIN_ANALOG_KBD) > 100) );
+  loadEEprom( bool(analogRead(PIN_ANALOG_KBD) > 100), EE_OFFSET );
   
   setBacklight(1);
 
   lcd.setCursor(0,1);
-  lcd.print(" imp cntr (v." + String(storage.version) + ")");
+  lcd.print(VERSION);
   delay(2000);
   lcd.home();                   // go home  
   lcd.print("deciWh/pulse " + String(ORWE_DECIWH_PER_PULSE));
@@ -191,9 +192,8 @@ void loop(){
       storage.totalWh += ORWE_DECIWH_PER_PULSE;
       power = 360000 * ORWE_DECIWH_PER_PULSE / timeDeltaMillis; 
       lastMeasurement = millis();
-      delay(5);
-      
-      PORTB &= ~B00100000; //set pin13 to LOW 
+      delay(10);
+
     }
     
    
@@ -205,16 +205,20 @@ void loop(){
       if ( timeState >= 2 ) {
         // --- 1 sec has passed ---- 
 
-        // correction if for a long time no impulse was received.
+        // set power=0 if for 12minutes no impulse was received.
+        PORTB |=  B00100000; //set pin13 to HIGH, give led a quick blink each second     
         unsigned long actMillis = millis();
         unsigned long passedMillis = actMillis - lastMeasurement;
         if ( passedMillis > 720000 and power > 0){
+          // set power to zero after 12 minutes without a signal
           timeDeltaMillis = passedMillis;
           lastMeasurement = actMillis; 
           power = 0; 
         }
         
-        PORTB |=  B00100000; //set pin13 to HIGH      
+        delayMicroseconds(50);
+        PORTB &= ~B00100000; //set pin13 to LOW 
+        
         temp = read_pt1000(analogRead(ANALOG_TEMPSENSOR_PIN));
         }     
 
@@ -227,14 +231,12 @@ void loop(){
         }
         //reset the new wh counter for the new day
         storage.daysWh[tmh.getDow(0)] = 0; 
-        storeEEprom();       
+        storeEEprom(EE_OFFSET);       
       }       
       
-      float kwh = storage.daysWh[tmh.getDow(0)] / 10000.0;
-      //float temp = 0.1105 * adValue + 0.583;
-      //lcd.print("" + String(adValue) + "  t=" + String(temp) + "\xdf"+"C       ");
-      
       PORTB &= ~B00100000; //set pin13 to LOW 
+      
+      float kwh = storage.daysWh[tmh.getDow(0)] / 10000.0;
 
 
       // ---- refresh display ----------------------------------------------------------------------------
@@ -242,11 +244,13 @@ void loop(){
       
       
       if ( displayMode == 0 ) {
-        // -- display normal information 
-        lcd.setCursor(0,0);
-        lcd.print(leftFill(String(power), 4, " ") + "W   " + leftFill(String(kwh, 2), 5, " ") + "kWh");
-        lcd.setCursor(0,1);
-        lcd.print(leftFill(String(temp), 4, " ") + "\xdf" + "C  " +  tmh.getDowName(0) + " " + tmh.getHrsMinSec());
+        // -- display normal information each second
+        if ( timeState >= 2 ) {
+          lcd.setCursor(0,0);
+          lcd.print(leftFill(String(power), 4, " ") + "W   " + leftFill(String(kwh, 2), 5, " ") + "kWh");
+          lcd.setCursor(0,1);
+          lcd.print(leftFill(String(temp), 4, " ") + "\xdf" + "C  " +  tmh.getDowName(0) + " " + tmh.getHrsMinSec());
+        }
       }
       
       else {
@@ -298,7 +302,7 @@ void loop(){
          }
            
           if (tmh.getSecondsCounter() > resetDisplayModeSeconds ) {
-            // fall back to standard display
+            // fall back to standard display after 5 seconds
             displayMode = 0;
           }
         }
@@ -322,7 +326,7 @@ void loop(){
         switch (kbdValue)
           {
           case KEY_ENTER:
-              storeEEprom();
+              storeEEprom(EE_OFFSET);
               break;
           case KEY_RIGHT:
               displayMode += 2;
@@ -330,6 +334,9 @@ void loop(){
                 displayMode = 0;
               }
               resetDisplayModeSeconds = tmh.getSecondsCounter() + 5;
+              break;
+          case 128 + KEY_RIGHT:
+              dumpEpromToSerial();
               break;
           case KEY_UP:
               tmh.incrementSecondsCounter(60);

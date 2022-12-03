@@ -48,9 +48,8 @@ void handleKeystroke_setDateTime() {
       kbdValue = 255; 
       lcd.noCursor();
       lcd.noBlink();
-
-      storeEEprom();
-       break;
+      storeEEprom(EE_OFFSET);
+      break;
     case SETTIME_KEY_RIGHT: // right (key 1 in set date time mode
         settingIdx++;
         if (settingIdx > 5) { settingIdx = 1; }
