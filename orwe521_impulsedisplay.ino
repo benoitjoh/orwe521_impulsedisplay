@@ -32,7 +32,7 @@ byte actualMonth = 0;
   // using the standard LCD Library
   #include <LiquidCrystal.h>
   //            lcd(rs, e, d4, d5, d6, d7); backlight: pin D6
-  LiquidCrystal lcd(LDC_RS,  LDC_E,   LDC_D4, LDC_D5, LDC_D6, LDC_D7);
+  LiquidCrystal lcd(LCD_RS,  LCD_E,   LCD_D4, LCD_D5, LCD_D6, LCD_D7);
   
   void setBacklight(byte state) {
     digitalWrite(6, state);
@@ -40,7 +40,7 @@ byte actualMonth = 0;
 #else
   // using the latchregister
   #include <LiquidCrystal_SR2W.h>
-  LiquidCrystal_SR2W lcd(LDC_DATA, LDC_CLOCK, POSITIVE);
+  LiquidCrystal_SR2W lcd(LCD_DATA, LCD_CLOCK, POSITIVE);
 
   void setBacklight(byte state) {
     lcd.setBacklight(state);
@@ -71,8 +71,14 @@ String leftFill(String a, byte wantedLen, String fillLetter)
 }
 
 
-// --- Variables that will be stored in eeprom persistent --------------------- 
-#include "eeAny.h"
+
+// EEPROM ------------------------------------------------------------------
+#include <EEPROM.h>
+
+#define EE_OFFSET 128  // start adress for the EEPROM data area
+#define EE_OFFSET_DOY 300 //start adress for the 367 bytes for doy values
+
+// --- Variables that will be stored in eeprom persistent 
 struct {
     long secondsCounter = 70000;
     long dayCounter = 100;
@@ -82,31 +88,16 @@ struct {
     int version = 1;
 } storage;
 
-//void migrateData() {
-//  //optional method to lift data model from one version to another 
-//  storage.totalWh *= 10;
-//  storage.version = 2;
-//  for (int i=0; i<7; i++) { storage.daysWh[i] *= 10; }
-//  for (int i=0; i<13; i++) { storage.monthsWh[i] *= 10; }
-//  
-//  storage.monthsWh[10] = 126400;
-//  storage.totalWh = 126400;
-//}
-
 void loadEEprom(bool reset, int offset) {
   lcd.setCursor(0,1);
   if (!reset) {
-    EEPROM_readAnything(offset, storage);
+    EEPROM.get(offset, storage);
     lcd.print("data loaded.     ");
-//    if ( storage.version != 2 ) {
-//      migrateData();
-//  }
   }
   else {
     lcd.print("EEPROM reset.     ");
     delay(500);
   }
-  
   
   tmh.setSecondsCounter(storage.secondsCounter);
   tmh.setDayCounter(storage.dayCounter);
@@ -118,13 +109,26 @@ void loadEEprom(bool reset, int offset) {
 void storeEEprom(int offset) {
   storage.secondsCounter = tmh.getSecondsCounter();
   storage.dayCounter = tmh.getDayCounter();
-  EEPROM_writeAnything(offset, storage);
+  EEPROM.put(offset, storage);
   lcd.setCursor(0,1);
   lcd.print("data saved. ");
   delay(500);
 }
 
+// --------  array of 367 values in eeprom for each day of year that holds 
+//           the day sumary (in hecto Watt hours) -----
+//           i=1 is first of january
 
+void updateDayOfYearTotal(int dayOfYear, byte value) {
+  EEPROM.update(EE_OFFSET_DOY + dayOfYear, value);
+}
+
+
+byte getDayOfYearTotal(int dayOfYear) {
+  byte value;
+  EEPROM.get(EE_OFFSET_DOY + dayOfYear, value);
+  return value;
+}
 
 
 // ------------------------------------------------------------------------------------------
@@ -180,16 +184,19 @@ void loop(){
     actualMonth = tmh.getMonth(0);
 
     // get the milliseconds between last and actual signal.
-    //  if a result is valid, a value > 0 is passed back
+    // if a result is valid, a value > 0 is passed back
+    
     unsigned long timeDeltaMillis = getStableSignalDelta(SIGNAL_PIN);
+    
     if ( timeDeltaMillis > 0 ) {
       // one impulse received means 1 Wh was comsumed. time passed since last impulse --> power
-      PORTB |=  B00100000; //set pin13 to HIGH      
-
       
-      storage.daysWh[tmh.getDow(0)] += ORWE_DECIWH_PER_PULSE;
+      PORTB |=  B00100000; //set pin13 to HIGH (for a long blink)
+      
+      storage.daysWh[tmh.getDayOfWeek(0)] += ORWE_DECIWH_PER_PULSE;
       storage.monthsWh[tmh.getMonth(0)] += ORWE_DECIWH_PER_PULSE;
       storage.totalWh += ORWE_DECIWH_PER_PULSE;
+      
       power = 360000 * ORWE_DECIWH_PER_PULSE / timeDeltaMillis; 
       lastMeasurement = millis();
       delay(10);
@@ -230,13 +237,19 @@ void loop(){
           storage.monthsWh[tmh.getMonth(0)] = 0;
         }
         //reset the new wh counter for the new day
-        storage.daysWh[tmh.getDow(0)] = 0; 
+        storage.daysWh[tmh.getDayOfWeek(0)] = 0; 
+
         storeEEprom(EE_OFFSET);       
+
+        // finally fill the value from yesterday in the dayOfYear array in EEPROM
+        byte yesterdayTotal_hWh = byte(storage.daysWh[tmh.getDayOfWeek(-1)] / 1000);
+        updateDayOfYearTotal(tmh.getDayOfYear(-1), yesterdayTotal_hWh);
+        
       }       
       
       PORTB &= ~B00100000; //set pin13 to LOW 
       
-      float kwh = storage.daysWh[tmh.getDow(0)] / 10000.0;
+      float kwh = storage.daysWh[tmh.getDayOfWeek(0)] / 10000.0;
 
 
       // ---- refresh display ----------------------------------------------------------------------------
@@ -249,7 +262,7 @@ void loop(){
           lcd.setCursor(0,0);
           lcd.print(leftFill(String(power), 4, " ") + "W   " + leftFill(String(kwh, 2), 5, " ") + "kWh");
           lcd.setCursor(0,1);
-          lcd.print(leftFill(String(temp), 4, " ") + "\xdf" + "C  " +  tmh.getDowName(0) + " " + tmh.getHrsMinSec());
+          lcd.print(leftFill(String(temp), 4, " ") + "\xdf" + "C  " +  tmh.getDayOfWeekName(0) + " " + tmh.getHrsMinSec());
         }
       }
       
@@ -276,10 +289,10 @@ void loop(){
               case 4 ... 8:
                 // days hist
                 index = - (displayMode - 3);
-                wh1 = storage.daysWh[tmh.getDow(index)];
-                wh2 = storage.daysWh[tmh.getDow(index -1)];
-                lbl1 = tmh.getDowName(index);
-                lbl2 = tmh.getDowName(index - 1);
+                wh1 = storage.daysWh[tmh.getDayOfWeek(index)];
+                wh2 = storage.daysWh[tmh.getDayOfWeek(index -1)];
+                lbl1 = tmh.getDayOfWeekName(index);
+                lbl2 = tmh.getDayOfWeekName(index - 1);
                 break;
               case 10 ... 22:
                 // months hist
