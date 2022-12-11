@@ -75,16 +75,16 @@ String leftFill(String a, byte wantedLen, String fillLetter)
 // EEPROM ------------------------------------------------------------------
 #include <EEPROM.h>
 
-#define EE_OFFSET 128  // start adress for the EEPROM data area
-#define EE_OFFSET_DOY 300 //start adress for the 367 bytes for doy values
+#define EE_OFFSET 0  // start adress for the EEPROM data area
+#define EE_OFFSET_DOY 128 //start adress for the 367 bytes where the daily revenue for all Days of Year is stored
 
 // --- Variables that will be stored in eeprom persistent 
 struct {
     long secondsCounter = 70000;
-    long dayCounter = 100;
-    unsigned long totalWh = 412100;
-    unsigned long daysWh[7] = {0, 0, 0, 0, 20000, 9700, 120}; // monday = 0 
-    unsigned long monthsWh[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 223000, 188900 ,0}; // jan = 1, dec = 12
+    long dayCounter = 1100;
+    unsigned long totalWh = 591300;
+    unsigned long daysWh[7] = {7400, 16100, 15900, 18700, 1700, 100, 7500}; // monday = 0 
+    unsigned long monthsWh[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 223000, 278100 ,71500}; // jan = 1, dec = 12
     int version = 1;
 } storage;
 
@@ -92,12 +92,18 @@ void loadEEprom(bool reset, int offset) {
   lcd.setCursor(0,1);
   if (!reset) {
     EEPROM.get(offset, storage);
-    lcd.print("data loaded.     ");
+    lcd.print(F("data loaded.     "));
   }
   else {
-    lcd.print("EEPROM reset.     ");
+    // load values from default above.
+    lcd.print(F("EEPROM reset.     "));
     delay(500);
-  }
+    // comment in to reset the day of year values 
+    /*for (int i=0; i<367; i++) {
+      updateDayOfYearTotal(i, 0);
+    }*/
+    }
+  
   
   tmh.setSecondsCounter(storage.secondsCounter);
   tmh.setDayCounter(storage.dayCounter);
@@ -111,7 +117,7 @@ void storeEEprom(int offset) {
   storage.dayCounter = tmh.getDayCounter();
   EEPROM.put(offset, storage);
   lcd.setCursor(0,1);
-  lcd.print("data saved. ");
+  lcd.print(F("data saved. "));
   delay(500);
 }
 
@@ -145,11 +151,21 @@ void setup()
 
   lcd.begin(16,2);               // initialize the lcd
   lcd.home();                   // go home  
-  lcd.print(" # OR-WE-521 #"); 
+  lcd.print(F(" # OR-WE-521 #")); 
   delay(500);
    
   // if no key is pressed on start, read values from eeprom, else reset
-  loadEEprom( bool(analogRead(PIN_ANALOG_KBD) > 100), EE_OFFSET );
+  bool doReset = false;
+  if (analogRead(PIN_ANALOG_KBD) > 100) {
+    lcd.setCursor(0,0);
+    lcd.print(F("ovewrite EEPROM?"));
+    lcd.setCursor(2,1);
+    lcd.print(F("yes --> Enter"));
+    byte kbdResult = kbd.wait_till_read();
+    doReset = bool(kbdResult == 0);
+  }
+
+  loadEEprom( doReset, EE_OFFSET );
   
   setBacklight(1);
 
@@ -157,7 +173,8 @@ void setup()
   lcd.print(VERSION);
   delay(2000);
   lcd.home();                   // go home  
-  lcd.print("deciWh/pulse " + String(ORWE_DECIWH_PER_PULSE));
+  lcd.print(F("deciWh/pulse "));
+  lcd.print(String(ORWE_DECIWH_PER_PULSE));
   delay(2000);
    
   lcd.noCursor();
@@ -258,12 +275,10 @@ void loop(){
       
       if ( displayMode == 0 ) {
         // -- display normal information each second
-        if ( timeState >= 2 ) {
           lcd.setCursor(0,0);
           lcd.print(leftFill(String(power), 4, " ") + "W   " + leftFill(String(kwh, 2), 5, " ") + "kWh");
           lcd.setCursor(0,1);
           lcd.print(leftFill(String(temp), 4, " ") + "\xdf" + "C  " +  tmh.getDayOfWeekName(0) + " " + tmh.getHrsMinSec());
-        }
       }
       
       else {
