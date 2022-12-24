@@ -27,7 +27,8 @@ void display_setDateTime() {
   if (refresh) {
     lcd.clear();
     lcd.setCursor(0,0);
-    lcd.print(F("Set time      ")); lcd.print(tmh.getDayOfWeekName(0)) ;
+    lcd.print(F("Set time      ")); 
+    lcd.print(tmh.getDayOfWeekName(0)) ;
     lcd.setCursor(0,1);
     /// pos        1  4    9  c  f
     /// show     "dd.mm.yyyy hh:mm" the :ss is cut of

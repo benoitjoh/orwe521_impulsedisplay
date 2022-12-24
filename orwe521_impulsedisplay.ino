@@ -21,6 +21,9 @@
 
 
 unsigned long power;
+unsigned long nowMillis;
+unsigned long lastIntervalStart;
+unsigned long lastTimeDeltaMillis;
 int temp = 0;
 byte displayMode = 0; 
 long resetDisplayModeSeconds = 0;
@@ -83,8 +86,8 @@ struct {
     long secondsCounter = 70000;
     long dayCounter = 1100;
     unsigned long totalWh = 591300;
-    unsigned long daysWh[7] = {7400, 16100, 15900, 18700, 1700, 100, 7500}; // monday = 0 
-    unsigned long monthsWh[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 223000, 278100 ,71500}; // jan = 1, dec = 12
+    unsigned long days_cWh[7] = {7400, 16100, 15900, 18700, 1700, 100, 7500}; // monday = 0 
+    unsigned long months_cWh[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 223000, 278100 ,71500}; // jan = 1, dec = 12
     int version = 1;
 } storage;
 
@@ -171,11 +174,11 @@ void setup()
 
   lcd.setCursor(0,1);
   lcd.print(VERSION);
-  delay(2000);
+  delay(1000);
   lcd.home();                   // go home  
   lcd.print(F("deciWh/pulse "));
   lcd.print(String(ORWE_DECIWH_PER_PULSE));
-  delay(2000);
+  delay(1000);
    
   lcd.noCursor();
   lcd.clear();
@@ -199,7 +202,7 @@ unsigned long lastMeasurement = 0;
 
 void loop(){
     actualMonth = tmh.getMonth(0);
-
+    nowMillis = millis();
     // get the milliseconds between last and actual signal.
     // if a result is valid, a value > 0 is passed back
     
@@ -210,12 +213,13 @@ void loop(){
       
       PORTB |=  B00100000; //set pin13 to HIGH (for a long blink)
       
-      storage.daysWh[tmh.getDayOfWeek(0)] += ORWE_DECIWH_PER_PULSE;
-      storage.monthsWh[tmh.getMonth(0)] += ORWE_DECIWH_PER_PULSE;
+      storage.days_cWh[tmh.getDayOfWeek(0)] += ORWE_DECIWH_PER_PULSE;
+      storage.months_cWh[tmh.getMonth(0)] += ORWE_DECIWH_PER_PULSE;
       storage.totalWh += ORWE_DECIWH_PER_PULSE;
-      
       power = 360000 * ORWE_DECIWH_PER_PULSE / timeDeltaMillis; 
-      lastMeasurement = millis();
+      Serial.println("loop: now:" + String(nowMillis) + " delta:" + String(timeDeltaMillis)+ " pwr:" + String(power));
+      lastIntervalStart = millis() - timeDeltaMillis;
+      lastTimeDeltaMillis = timeDeltaMillis;
       delay(10);
 
     }
@@ -231,12 +235,18 @@ void loop(){
 
         // set power=0 if for 12minutes no impulse was received.
         PORTB |=  B00100000; //set pin13 to HIGH, give led a quick blink each second     
-        unsigned long actMillis = millis();
-        unsigned long passedMillis = actMillis - lastMeasurement;
+        
+        unsigned long passedMillis = nowMillis - lastIntervalStart - lastTimeDeltaMillis;
+        
+        if ( passedMillis > (lastTimeDeltaMillis) and power > 0){
+          // reduce time if for longer time no impulse was fetched
+          power = 360000 * ORWE_DECIWH_PER_PULSE / passedMillis;
+          Serial.println("red : now:" + String(nowMillis) + " lastTimeDeltaMillis:" + String(lastTimeDeltaMillis)+ " passedMillis:" + String(passedMillis));
+         
+        }
+        
         if ( passedMillis > 720000 and power > 0){
           // set power to zero after 12 minutes without a signal
-          timeDeltaMillis = passedMillis;
-          lastMeasurement = actMillis; 
           power = 0; 
         }
         
@@ -251,22 +261,26 @@ void loop(){
 
         if ( actualMonth != tmh.getMonth(0) ) {
           // new month has started... so reset the actual counter 
-          storage.monthsWh[tmh.getMonth(0)] = 0;
+          storage.months_cWh[tmh.getMonth(0)] = 0;
         }
         //reset the new wh counter for the new day
-        storage.daysWh[tmh.getDayOfWeek(0)] = 0; 
+        storage.days_cWh[tmh.getDayOfWeek(0)] = 0; 
 
         storeEEprom(EE_OFFSET);       
 
         // finally fill the value from yesterday in the dayOfYear array in EEPROM
-        byte yesterdayTotal_hWh = byte(storage.daysWh[tmh.getDayOfWeek(-1)] / 1000);
+        // 1000 centiWh = 1 hectoWh
+        byte yesterdayTotal_hWh = byte(storage.days_cWh[tmh.getDayOfWeek(-1)] / 1000);
+        if (storage.days_cWh[tmh.getDayOfWeek(-1)] % 1000  > 499) {
+          yesterdayTotal_hWh +=1;
+          }
         updateDayOfYearTotal(tmh.getDayOfYear(-1), yesterdayTotal_hWh);
         
       }       
       
       PORTB &= ~B00100000; //set pin13 to LOW 
       
-      float kwh = storage.daysWh[tmh.getDayOfWeek(0)] / 10000.0;
+      float kwh = storage.days_cWh[tmh.getDayOfWeek(0)] / 10000.0;
 
 
       // ---- refresh display ----------------------------------------------------------------------------
@@ -304,16 +318,16 @@ void loop(){
               case 4 ... 8:
                 // days hist
                 index = - (displayMode - 3);
-                wh1 = storage.daysWh[tmh.getDayOfWeek(index)];
-                wh2 = storage.daysWh[tmh.getDayOfWeek(index -1)];
+                wh1 = storage.days_cWh[tmh.getDayOfWeek(index)];
+                wh2 = storage.days_cWh[tmh.getDayOfWeek(index -1)];
                 lbl1 = tmh.getDayOfWeekName(index);
                 lbl2 = tmh.getDayOfWeekName(index - 1);
                 break;
               case 10 ... 22:
                 // months hist
                 index = - (displayMode - 10);
-                wh1 = storage.monthsWh[tmh.getMonth(index)];
-                wh2 = storage.monthsWh[tmh.getMonth(index - 1)];
+                wh1 = storage.months_cWh[tmh.getMonth(index)];
+                wh2 = storage.months_cWh[tmh.getMonth(index - 1)];
                 lbl1 = tmh.getMonthName(index);
                 lbl2 = tmh.getMonthName(index - 1);
                 break;
