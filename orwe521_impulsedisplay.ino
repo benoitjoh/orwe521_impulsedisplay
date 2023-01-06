@@ -15,10 +15,8 @@
 #include "config.h"
 #define VERSION "v1.1/" __DATE__
 
-
 #define ORWE_PULSE_PER_KWH 1000
 #define ORWE_DECIWH_PER_PULSE ( 10000 / ORWE_PULSE_PER_KWH )
-
 
 unsigned long power;
 unsigned long nowMillis;
@@ -28,6 +26,8 @@ int temp = 0;
 byte displayMode = 0; 
 long resetDisplayModeSeconds = 0;
 byte actualMonth = 0;
+
+char statusSign; 
 
 // --- liquid crystal display driver from LiquidCrystal.h or LiquidCrystal_SR2W.h ---------------------------------------------
 
@@ -140,8 +140,6 @@ byte getDayOfYearTotal(int dayOfYear) {
 }
 
 
-// ------------------------------------------------------------------------------------------
-
 
 
 // Initialization ---------------------------------------------------------------------------
@@ -151,9 +149,9 @@ void setup()
   
   displayMode = 0; // 0 means actual day.
   resetDisplayModeSeconds = 0;
-
-  lcd.begin(16,2);               // initialize the lcd
-  lcd.home();                   // go home  
+  
+  init_lcd();
+  
   lcd.print(F(" # OR-WE-521 #")); 
   delay(500);
    
@@ -175,10 +173,16 @@ void setup()
   lcd.setCursor(0,1);
   lcd.print(VERSION);
   delay(1000);
-  lcd.home();                   // go home  
-  lcd.print(F("deciWh/pulse "));
-  lcd.print(String(ORWE_DECIWH_PER_PULSE));
-  delay(1000);
+  lcd.home(); 
+  lcd.clear();
+
+  // konfiguration of keyboard
+  lcd.print(F("  AnalogKBD") );
+  lcd.setCursor(0,1);
+  lcd.print(String(KBD_NR_OF_KEYS));
+  lcd.print(F(" Keys, pin:") );
+  lcd.print(String(PIN_ANALOG_KBD));
+  delay(3000);
    
   lcd.noCursor();
   lcd.clear();
@@ -193,6 +197,7 @@ void setup()
   {
       ; // wait for serial Pin to connect. otherwise reset if serial console is started :-/
   }
+  statusSign = ' ';
 
 }
 
@@ -221,6 +226,7 @@ void loop(){
       lastIntervalStart = millis() - timeDeltaMillis;
       lastTimeDeltaMillis = timeDeltaMillis;
       delay(10);
+      statusSign = 1;
 
     }
     
@@ -242,7 +248,7 @@ void loop(){
           // reduce time if for longer time no impulse was fetched
           power = 360000 * ORWE_DECIWH_PER_PULSE / passedMillis;
           Serial.println("red : now:" + String(nowMillis) + " lastTimeDeltaMillis:" + String(lastTimeDeltaMillis)+ " passedMillis:" + String(passedMillis));
-         
+          statusSign = ' ';
         }
         
         if ( passedMillis > 720000 and power > 0){
@@ -290,7 +296,9 @@ void loop(){
       if ( displayMode == 0 ) {
         // -- display normal information each second
           lcd.setCursor(0,0);
-          lcd.print(leftFill(String(power), 4, " ") + "W   " + leftFill(String(kwh, 2), 5, " ") + "kWh");
+          lcd.print(leftFill(String(power), 4, " ") + "W ");
+          lcd.write(statusSign);
+          lcd.print(" " + leftFill(String(kwh, 2), 5, " ") + "kWh");
           lcd.setCursor(0,1);
           lcd.print(leftFill(String(temp), 4, " ") + "\xdf" + "C  " +  tmh.getDayOfWeekName(0) + " " + tmh.getHrsMinSec());
       }
