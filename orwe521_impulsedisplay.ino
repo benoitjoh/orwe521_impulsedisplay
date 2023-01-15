@@ -172,7 +172,9 @@ void setup()
 
   lcd.setCursor(0,1);
   lcd.print(VERSION);
+#ifndef QUICKSTART
   delay(1000);
+#endif
   lcd.home(); 
   lcd.clear();
 
@@ -180,10 +182,11 @@ void setup()
   lcd.print(F("  AnalogKBD") );
   lcd.setCursor(0,1);
   lcd.print(String(KBD_NR_OF_KEYS));
-  lcd.print(F(" Keys, pin:") );
+  lcd.print(F(" Keys / Pin:") );
   lcd.print(String(PIN_ANALOG_KBD));
+#ifndef QUICKSTART
   delay(3000);
-   
+#endif   
   lcd.noCursor();
   lcd.clear();
 
@@ -247,7 +250,7 @@ void loop(){
         if ( passedMillis > (lastTimeDeltaMillis) and power > 0){
           // reduce time if for longer time no impulse was fetched
           power = 360000 * ORWE_DECIWH_PER_PULSE / passedMillis;
-          Serial.println("red : now:" + String(nowMillis) + " lastTimeDeltaMillis:" + String(lastTimeDeltaMillis)+ " passedMillis:" + String(passedMillis));
+          //Serial.println("red : now:" + String(nowMillis) + " lastTimeDeltaMillis:" + String(lastTimeDeltaMillis)+ " passedMillis:" + String(passedMillis));
           statusSign = ' ';
         }
         
