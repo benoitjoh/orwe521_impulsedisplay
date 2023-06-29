@@ -146,7 +146,6 @@ byte getDayOfYearTotal(int dayOfYear) {
 
 void setup()
 {
-  
   displayMode = 0; // 0 means actual day.
   resetDisplayModeSeconds = 0;
   
@@ -209,7 +208,6 @@ void setup()
 unsigned long lastMeasurement = 0;
 
 void loop(){
-    actualMonth = tmh.getMonth(0);
     nowMillis = millis();
     // get the milliseconds between last and actual signal.
     // if a result is valid, a value > 0 is passed back
@@ -220,7 +218,6 @@ void loop(){
       // one impulse received means 1 Wh was comsumed. time passed since last impulse --> power
       
       PORTB |=  B00100000; //set pin13 to HIGH (for a long blink)
-      
       storage.days_cWh[tmh.getDayOfWeek(0)] += ORWE_DECIWH_PER_PULSE;
       storage.months_cWh[tmh.getMonth(0)] += ORWE_DECIWH_PER_PULSE;
       storage.totalWh += ORWE_DECIWH_PER_PULSE;
@@ -241,6 +238,7 @@ void loop(){
  
       if ( timeState >= 2 ) {
         // --- 1 sec has passed ---- 
+        actualMonth = tmh.getMonth(0);
 
         // set power=0 if for 12minutes no impulse was received.
         PORTB |=  B00100000; //set pin13 to HIGH, give led a quick blink each second     
@@ -252,7 +250,7 @@ void loop(){
           power = 360000 * ORWE_DECIWH_PER_PULSE / passedMillis;
           //Serial.println("red : now:" + String(nowMillis) + " lastTimeDeltaMillis:" + String(lastTimeDeltaMillis)+ " passedMillis:" + String(passedMillis));
           statusSign = ' ';
-        }
+       }
         
         if ( passedMillis > 720000 and power > 0){
           // set power to zero after 12 minutes without a signal

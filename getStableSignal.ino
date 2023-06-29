@@ -8,53 +8,48 @@
 // a signal must remain for at least some millisecs
 #define MIN_SIGNAL_PERIOD 50
 
-unsigned long actMillis;
-unsigned long signalMillis = 0;
-unsigned long lastSignalMillis = 0;
-unsigned long signalStableMillis = 0;
 
+unsigned long signalStartMillis = 0;
+unsigned long lastSignalStartMillis = 0;
 boolean waitForValidation;
 boolean waitForReset;
 
    
 unsigned long getStableSignalDelta(byte pin) {
      
-   unsigned long timeDeltaMillis = 0;
-   
-   actMillis = millis();
+    unsigned long timeDeltaMillis = 0;
+    unsigned long actMillis = millis();
 
     // read the pin
-    byte pinLevel = digitalRead(pin);
     
-    if (pinLevel == 1) {
-      // if positive, store the time once and then wait vor it to validate 
+    if (digitalRead(pin) == 1) {
+      // if positive, store the time once and then wait for it to validate 
       if (!waitForValidation and !waitForReset) {
-        signalMillis = actMillis;    
+        signalStartMillis = actMillis;    
         waitForValidation = true;
-        //Serial.println("signal candidate at: " + String(signalMillis) );
+        //Serial.println("signal candidate at: " + String(signalStartMillis) );
       }
        
     }
     else {
-      if (true) {
         waitForReset = false;
         waitForValidation = false;
-      }
-      
     }
-    signalStableMillis = actMillis - signalMillis;
+    
+    unsigned long signalStableMillis = actMillis - signalStartMillis;
 
     if (!waitForReset) {
-      if (waitForValidation) {
-        if ( signalStableMillis > MIN_SIGNAL_PERIOD  ) {
-          timeDeltaMillis = signalMillis - lastSignalMillis;
-          lastSignalMillis = signalMillis;
-          waitForValidation = false;
-          waitForReset = true;
-          Serial.println("act:" + String(signalMillis) + " delta:" + String(timeDeltaMillis));
+        if (waitForValidation) {
+            if ( signalStableMillis > MIN_SIGNAL_PERIOD  ) {
+                // now it is a good signal. return the timespan between start and last start
+                timeDeltaMillis = signalStartMillis - lastSignalStartMillis;
+                lastSignalStartMillis = signalStartMillis;
+                waitForValidation = false;
+                waitForReset = true;
+                Serial.println("act:" + String(signalStartMillis) + " delta:" + String(timeDeltaMillis));
+            }
         }
-      }
     }
-  return timeDeltaMillis;
+    return timeDeltaMillis;
     
 }
