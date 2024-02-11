@@ -1,5 +1,12 @@
-/*  
- *   parameters an function to read a pt-1000 temperature sensor. 
+/*  ------------------------------------------------------------------------------------
+ *  Collection of transformation functions for Temperatur sensors
+ *  ------------------------------------------------------------------------------------
+ */   
+
+
+ 
+ /*  ------------------------------------------------------------------------------------  
+ *   parameters an function to read a pt-1000 temperature sensor (NTC). 
  *   
  *   wiring: 
  *   
@@ -44,4 +51,26 @@ int read_pt1000(int adValue)
     else 
        temperatur = ERR_VALUE;        // if PT1000 is disconnected
     return temperatur;
+}
+
+
+/*  --------------------------------------------------------------------
+ *  Temperaturesensor from DELL battery packs (PTC)
+ *   wiring: 
+ *   
+ *   
+ *      vcc --+----------+--------- 
+ *            |          |
+ *            |        v[R] pt-1000
+ *           ---         |
+ *           --- 100nF   +-------------------- ADC in
+ *            |          |
+ *            |         [R] 10k
+ *            |          |
+ *      GND --+----------+---------
+*/
+
+int read_dellakku_tempsensor(int adValue) {
+    int interpolated = int((0.138 * float(adValue)) - 37); 
+    return interpolated;
 }
