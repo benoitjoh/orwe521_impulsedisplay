@@ -12,7 +12,6 @@
 byte settingIdx = 1;
 const byte cursPos[6] = {0, 1, 4, 9, 12, 15};
 bool setInitialized = false;
-bool refresh = true;
 
 void start_setDateTime() {
   displayMode = 99; 
@@ -24,23 +23,17 @@ void display_setDateTime() {
     lcd.cursor();
     lcd.blink();
   }
-  if (refresh) {
     lcd.clear();
     lcd.setCursor(0,0);
-    lcd.print(F("Set time      ")); 
-    lcd.print(tmh.getDayOfWeekName(0)) ;
+    lcd.print("Set time  " + tmh.getDayOfWeekName(0) + "  " + tmh.getSec()); 
     lcd.setCursor(0,1);
     /// pos        1  4    9  c  f
     /// show     "dd.mm.yyyy hh:mm" the :ss is cut of
     lcd.print(tmh.getDayMonYear()+ " " + tmh.getHrsMinSec());
     lcd.setCursor(cursPos[settingIdx], 1);
-    refresh = false;
-
-  }
 }
 
 void handleKeystroke_setDateTime() {
-  refresh = true;
   switch (kbdValue) 
     {
     case SETTIME_KEY_ENTER:   // enter (key 0 in set date time mode
@@ -49,6 +42,7 @@ void handleKeystroke_setDateTime() {
       kbdValue = 255; 
       lcd.noCursor();
       lcd.noBlink();
+      tmh.resetSecToZero();
       storeEEprom(EE_OFFSET);
       break;
     case SETTIME_KEY_RIGHT: // right (key 1 in set date time mode

@@ -18,17 +18,24 @@
 #define ORWE_PULSE_PER_KWH 1000
 #define ORWE_DECIWH_PER_PULSE ( 10000 / ORWE_PULSE_PER_KWH )
 
+// alarm for second temp sensor
+#define FRIDGE_TEMP_MAX -15
+boolean fridge_alarm = false;
+boolean fridge_quit = false;
+
 unsigned long power;
 unsigned long nowMillis;
 unsigned long lastIntervalStart;
 unsigned long lastTimeDeltaMillis;
+
 int temp = 0;
+int temp_2 = 0;
 byte displayMode = 0; 
 long resetDisplayModeSeconds = 0;
 byte actualMonth = 0;
 
 char statusSign; 
-
+byte backlight = 1;
 // --- liquid crystal display driver from LiquidCrystal.h or LiquidCrystal_SR2W.h ---------------------------------------------
 
 #ifdef USE_STANDARD_LCD_LIBRARY
@@ -60,7 +67,7 @@ byte kbdValue = 255; //the value that is read from keyboard 255 is neutral value
 
 // --- timer helpers from TimeLoop.cpp ---------------------------------------------
 #include<TimeLoop.h>
-TimeLoop tmh(1);
+TimeLoop tmh(-2);
 
 // ---- string helper   ---------------------------------------------------------------  
 String leftFill(String a, byte wantedLen, String fillLetter)
@@ -235,7 +242,15 @@ void loop(){
 
     if ( timeState >= 1 ) {
       // --- 100ms has passed ---- this part needs 4ms for calculation... 
- 
+
+      if ( fridge_alarm ) {
+        backlight = !backlight;
+        }
+      else {
+        backlight = 1;
+        }
+      setBacklight(backlight);
+
       if ( timeState >= 2 ) {
         // --- 1 sec has passed ---- 
         actualMonth = tmh.getMonth(0);
@@ -250,17 +265,28 @@ void loop(){
           power = 360000 * ORWE_DECIWH_PER_PULSE / passedMillis;
           //Serial.println("red : now:" + String(nowMillis) + " lastTimeDeltaMillis:" + String(lastTimeDeltaMillis)+ " passedMillis:" + String(passedMillis));
           statusSign = ' ';
-       }
+          }
         
         if ( passedMillis > 720000 and power > 0){
           // set power to zero after 12 minutes without a signal
           power = 0; 
-        }
+          }
         
         delayMicroseconds(50);
         PORTB &= ~B00100000; //set pin13 to LOW 
-        
-        temp = read_pt1000(analogRead(ANALOG_TEMPSENSOR_PIN));
+        temp = read_pt1000(analogRead(ANALOG_TEMP_PT1000_PIN));
+        temp_2 = read_dellakku_tempsensor(analogRead(ANALOG_TEMP_DELL_PIN));
+
+        // fridge alarm
+        if (temp_2 > FRIDGE_TEMP_MAX) {
+          if ( !fridge_quit ) {
+            fridge_alarm = true;
+            }
+          }
+        else {
+          fridge_alarm = false;
+          fridge_quit = false;
+          }
         }     
 
       if ( timeState >= 3 ) {
@@ -301,7 +327,7 @@ void loop(){
           lcd.write(statusSign);
           lcd.print(" " + leftFill(String(kwh, 2), 5, " ") + "kWh");
           lcd.setCursor(0,1);
-          lcd.print(leftFill(String(temp), 4, " ") + "\xdf" + "C  " +  tmh.getDayOfWeekName(0) + " " + tmh.getHrsMinSec());
+          lcd.print(leftFill(String(temp), 4, " ") + "\xdf" + " " + leftFill(String(temp_2), 3, " ") + "\xdf" + " " + tmh.getHrsMinSec());
       }
       
       else {
@@ -369,6 +395,10 @@ void loop(){
     kbdValue = kbd.read();
       
      if (kbdValue != 255) { //key is pressed
+        // reset fridge alarm
+        fridge_alarm = false; 
+        fridge_quit = true; 
+        
         if (displayMode == 99) {
           // if its 99 (set date time) then keys for set date time is aktive
           // keys 0, 1, 2, 3, 4 as 20, 21, 22, 23 ,24 
