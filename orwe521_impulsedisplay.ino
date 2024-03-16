@@ -67,7 +67,7 @@ byte kbdValue = 255; //the value that is read from keyboard 255 is neutral value
 
 // --- timer helpers from TimeLoop.cpp ---------------------------------------------
 #include<TimeLoop.h>
-TimeLoop tmh(-1);
+TimeLoop tmh(0);
 
 // ---- string helper   ---------------------------------------------------------------  
 String leftFill(String a, byte wantedLen, String fillLetter) {
@@ -233,7 +233,6 @@ void loop() {
 
         if ( timeState >= 2 ) {
             // --- 1 sec has passed ---- 
-            actualMonth = tmh.getMonth(0);
 
             PORTB |=  B00100000; //set pin13 to HIGH, give led a quick blink each second     
 
@@ -290,7 +289,9 @@ void loop() {
                 }
 
             updateDayOfYearTotal(tmh.getDayOfYear(-1), yesterdayTotal_hWh);
-            }       
+            }  
+                 
+        actualMonth = tmh.getMonth(0);
 
         PORTB &= ~B00100000; //set pin13 to LOW 
 
@@ -313,6 +314,13 @@ void loop() {
                           tmh.getHrsMinSec());
                 break;
 
+            case 2:
+                // -- display overall kWh
+                lcd.clear();
+                kwh = storage.totalWh / 10000.0;
+                lcd.print("Ges.: " + leftFill(String(kwh, 2), 7, " ") + "kWh");
+                break; 
+
             case 30:
                 // -- debug information values of ad inputs
                 lcd.setCursor(0,0);
@@ -328,14 +336,7 @@ void loop() {
                 // -- set Time and date
                 display_setDateTime();
                 break;
-
-            case 2:
-                // -- display overall kWh
-                lcd.clear();
-                kwh = storage.totalWh / 10000.0;
-                lcd.print("Ges.: " + leftFill(String(kwh, 2), 7, " ") + "kWh");
-                break; 
-
+                
             case 4 ... 22 :
                 // -- flipp through the history ... 
                 int index = 0;
@@ -363,21 +364,27 @@ void loop() {
                         break;
 
                     }
-                    //Serial.println("index:" + String(index) + " lbl1: " + lbl1 + "  " + lbl2 + "  " + String(wh1));
+                    
+                //Serial.println("index:" + String(index) + " lbl1: " + lbl1 + "  " + lbl2 + "  " + String(wh1));
 
-                    lcd.setCursor(0,0);
-                    kwh = wh1 / 10000.0;
-                    lcd.print(leftFill(lbl1, 3, " ") + ".:  " + leftFill(String(kwh, 2), 6, " ") + "kWh");
-                    lcd.setCursor(0,1);
-                    kwh = wh2  / 10000.0;;
-                    lcd.print(leftFill(lbl2, 3, " ") + ".:  " + leftFill(String(kwh, 2), 6, " ") + "kWh");
+                lcd.setCursor(0,0);
+                kwh = wh1 / 10000.0;
+                lcd.print(leftFill(lbl1, 3, " ") + ".:  " + leftFill(String(kwh, 2), 6, " ") + "kWh");
+                lcd.setCursor(0,1);
+                kwh = wh2  / 10000.0;;
+                lcd.print(leftFill(lbl2, 3, " ") + ".:  " + leftFill(String(kwh, 2), 6, " ") + "kWh");
 
-                    if (tmh.getSecondsCounter() > resetDisplayModeSeconds ) {
-                        // fall back to standard display after 5 seconds
-                        displayMode = 0;
-                        }
                 break;
-                }
+
+            }
+        
+        if (displayMode < 30 and displayMode > 1 and
+            tmh.getSecondsCounter() > resetDisplayModeSeconds ) {
+            // fall back to standard display after 5 seconds exept display mode over 30 
+            // these displays should be manually reset
+            displayMode = 0;
+            }
+
 
         } // --- 100ms
 
@@ -394,10 +401,12 @@ void loop() {
             fridge_quit = true; 
 
             if (displayMode == 99) {
-                // if its 99 (set date time) then keys for set date time is aktive
+                // if its 99 (set date time) then keys for set date time is active
                 // keys 0, 1, 2, 3, 4 as 20, 21, 22, 23 ,24 
                 kbdValue += 20;
             }
+            // Serial.println("kbd:" + String(kbdValue) + " ad:" + String(kbd.getLastAdValue()));
+            
             switch (kbdValue)
                 {
                 case KEY_ENTER:
@@ -412,7 +421,7 @@ void loop() {
                     resetDisplayModeSeconds = tmh.getSecondsCounter() + 5;
                     break;
 
-                case 128 + KEY_RIGHT:
+                case KEY_RIGHT_LONG:
                     dumpEpromToSerial();
                     break;
 
@@ -429,7 +438,7 @@ void loop() {
                     tmh.incrementSecondsCounter(-60);
                     break;
 
-                case 128 + KEY_ENTER:  // key 0 long
+                case KEY_ENTER_LONG:  // key 0 long
                     start_setDateTime();
                     break;
 

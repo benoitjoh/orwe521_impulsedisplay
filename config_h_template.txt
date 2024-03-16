@@ -20,6 +20,12 @@
 #define KEY_UP    1
 #define KEY_DOWN  2
 
+#define KEY_ENTER_LONG (128 + KEY_ENTER) 
+#define KEY_RIGHT_LONG (128 + KEY_RIGHT)  
+#define KEY_LEFT_LONG (128 + KEY_LEFT) 
+#define KEY_UP_LONG (128 + KEY_UP) 
+#define KEY_DOWN_LONG (128 + KEY_DOWN) 
+
 // Display ---------------------------
 
 #define USE_STANDARD_LCD_LIBRARY  // which library used?

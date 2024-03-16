@@ -22,7 +22,9 @@ void display_setDateTime() {
   if (!setInitialized) {
     lcd.cursor();
     lcd.blink();
+    setInitialized = true;
   }
+
     lcd.clear();
     lcd.setCursor(0,0);
     lcd.print("Set time  " + tmh.getDayOfWeekName(0) + "  " + tmh.getSec()); 
@@ -42,6 +44,7 @@ void handleKeystroke_setDateTime() {
       kbdValue = 255; 
       lcd.noCursor();
       lcd.noBlink();
+      setInitialized = false;
       tmh.resetSecToZero();
       storeEEprom(EE_OFFSET);
       break;
