@@ -83,8 +83,10 @@ String leftFill(String a, byte wantedLen, String fillLetter) {
 // EEPROM ------------------------------------------------------------------
 #include <EEPROM.h>
 
-#define EE_OFFSET 0  // start adress for the EEPROM data area
+#define EE_OFFSET 0  // start adress for the EEPROM data area 
 #define EE_OFFSET_DOY 128 //start adress for the 367 bytes where the daily revenue for all Days of Year is stored
+
+#define CONF_ADDR_COUNT   8  // how many values do we have in the conf array? 
 
 // --- Variables that will be stored in eeprom persistent 
 struct {
@@ -93,7 +95,7 @@ struct {
     unsigned long totalWh = 591300;
     unsigned long days_cWh[7] = {7400, 16100, 15900, 18700, 1700, 100, 7500}; // monday = 0 
     unsigned long months_cWh[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 223000, 278100 ,71500}; // jan = 1, dec = 12
-    int version = 1;
+    int cfg[CONF_ADDR_COUNT] = {0, 0, 0, 0, 0, 0, 0, 0};
 } storage;
 
 void loadEEprom(bool reset, int offset) {
@@ -332,6 +334,11 @@ void loop() {
                     leftFill(String(analogRead(3)), 4, " ") );
                 break;
             
+            case 98:
+                // -- set Time and date
+                display_setConfigMenu();
+                break;
+
             case 99:
                 // -- set Time and date
                 display_setDateTime();
@@ -404,8 +411,12 @@ void loop() {
                 // if its 99 (set date time) then keys for set date time is active
                 // keys 0, 1, 2, 3, 4 as 20, 21, 22, 23 ,24 
                 kbdValue += 20;
-            }
-            // Serial.println("kbd:" + String(kbdValue) + " ad:" + String(kbd.getLastAdValue()));
+                }
+
+            if (displayMode == 98) { // set config menu
+                kbdValue += 30;
+                }
+            Serial.println("kbd:" + String(kbdValue) + " ad:" + String(kbd.getLastAdValue()));
             
             switch (kbdValue)
                 {
@@ -414,7 +425,7 @@ void loop() {
                     break;
 
                 case KEY_RIGHT:
-                    displayMode += 2;
+                    displayMode += 2; // flip through the history pages
                     if ( displayMode > 20 ) {
                         displayMode = 0;
                     }
@@ -438,14 +449,21 @@ void loop() {
                     tmh.incrementSecondsCounter(-60);
                     break;
 
-                case KEY_ENTER_LONG:  // key 0 long
-                    start_setDateTime();
+                case KEY_ENTER_LONG:
+                    displayMode = 99; // start setDateTime 
+                    break;
+
+                case KEY_DOWN_LONG:
+                    displayMode = 98; // start setConfig 
                     break;
 
                 case 20 ... 24: 
                     handleKeystroke_setDateTime();
                     break;
 
+                case 30 ... 34: 
+                    handleKeystroke_setConfigMenu();
+                    break;
                 default:
                     break;
                 }

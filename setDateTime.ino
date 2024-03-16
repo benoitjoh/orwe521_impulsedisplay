@@ -13,10 +13,6 @@ byte settingIdx = 1;
 const byte cursPos[6] = {0, 1, 4, 9, 12, 15};
 bool setInitialized = false;
 
-void start_setDateTime() {
-  displayMode = 99; 
-}
-
 
 void display_setDateTime() {
   if (!setInitialized) {
