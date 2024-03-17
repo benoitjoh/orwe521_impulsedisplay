@@ -12,17 +12,7 @@
 #define SETCONFIG_KEY_DOWN  (30 + KEY_DOWN) 
 
 
-// *** config paramters adjustable in configMenu ************************************** //
 
-// defines access values...
-#define CONF_TIMECORR_SEC_PER_DAY 0
-#define CONF_V1 1
-#define CONF_V2 2
-#define CONF_V3 3
-#define CONF_V4 4
-#define CONF_V5 5
-#define CONF_V6 6
-#define CONF_V7 7
 
 byte codeAddr = 0; // index for setting the parameters
 int newVal = 0;

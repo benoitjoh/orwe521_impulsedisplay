@@ -98,6 +98,16 @@ struct {
     int cfg[CONF_ADDR_COUNT] = {0, 0, 0, 0, 0, 0, 0, 0};
 } storage;
 
+// *** config paramters adjustable in configMenu ************************************** //
+#define CONF_TIMECORR_MS_PER_HOUR 0
+#define CONF_V1 1
+#define CONF_V2 2
+#define CONF_V3 3
+#define CONF_V4 4
+#define CONF_V5 5
+#define CONF_V6 6
+#define CONF_V7 7
+
 void loadEEprom(bool reset, int offset) {
     lcd.setCursor(0,1);
     if (!reset) {
@@ -116,14 +126,17 @@ void loadEEprom(bool reset, int offset) {
 
     tmh.setSecondsCounter(storage.secondsCounter);
     tmh.setDayCounter(storage.dayCounter);
+    tmh.setMsPerHourCorrection(storage.cfg[CONF_TIMECORR_MS_PER_HOUR]);
 
     delay(800);
 
     }
 
 void storeEEprom(int offset) {
+    // apply configuration changes, and store all to eprom 
     storage.secondsCounter = tmh.getSecondsCounter();
     storage.dayCounter = tmh.getDayCounter();
+    tmh.setMsPerHourCorrection(storage.cfg[CONF_TIMECORR_MS_PER_HOUR]);
     EEPROM.put(offset, storage);
     lcd.setCursor(0,1);
     lcd.print(F("data saved. "));
