@@ -26,7 +26,7 @@ boolean fridge_quit = false;
 unsigned long power;
 unsigned long nowMillis;
 unsigned long lastIntervalStart;
-unsigned long lastTimeDeltaMillis;
+float lastTimeDeltaMillis;
 
 int temp = 0;
 int temp_2 = 0;
@@ -88,14 +88,14 @@ String leftFill(String a, byte wantedLen, String fillLetter) {
 
 #define CONF_ADDR_COUNT   8  // how many values do we have in the conf array? 
 
-// --- Variables that will be stored in eeprom persistent 
+// --- Variables that will be stored in eeprom persistent actually 100byte long --- 
 struct {
-    long secondsCounter = 70000;
-    long dayCounter = 1100;
-    unsigned long totalWh = 591300;
-    unsigned long days_cWh[7] = {7400, 16100, 15900, 18700, 1700, 100, 7500}; // monday = 0 
-    unsigned long months_cWh[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 223000, 278100 ,71500}; // jan = 1, dec = 12
-    int cfg[CONF_ADDR_COUNT] = {0, 0, 0, 0, 0, 0, 0, 0};
+long secondsCounter = 11769;
+long dayCounter = 1525;
+unsigned long totalWh = 596850;
+unsigned long days_cWh[7] = {180,16100,16380,19550,510,1060,640,};
+unsigned long months_cWh[13] = {0,480,1650,1950,0,0,0,0,0,0,223000,278100,71640,};
+int cfg[CONF_ADDR_COUNT] = {423,6,-1,-1,-1,-1,-1,-1,};
 } storage;
 
 // *** config paramters adjustable in configMenu ************************************** //
@@ -132,12 +132,12 @@ void loadEEprom(bool reset, int offset) {
 
     }
 
-void storeEEprom(int offset) {
+void storeEEprom() {
     // apply configuration changes, and store all to eprom 
     storage.secondsCounter = tmh.getSecondsCounter();
     storage.dayCounter = tmh.getDayCounter();
     tmh.setMsPerHourCorrection(storage.cfg[CONF_TIMECORR_MS_PER_HOUR]);
-    EEPROM.put(offset, storage);
+    EEPROM.put(EE_OFFSET, storage);
     lcd.setCursor(0,1);
     lcd.print(F("data saved. "));
     delay(500);
@@ -202,7 +202,7 @@ void setup() {
         ; // wait for serial Pin to connect. otherwise reset if serial console is started :-/
         }
         
-    statusSign = ' ';
+    statusSign = 32;
 
 }
 
@@ -227,7 +227,7 @@ void loop() {
         power = 360000 * ORWE_DECIWH_PER_PULSE / timeDeltaMillis; 
         Serial.println("loop: now:" + String(nowMillis) + " delta:" + String(timeDeltaMillis)+ " pwr:" + String(power));
         lastIntervalStart = millis() - timeDeltaMillis;
-        lastTimeDeltaMillis = timeDeltaMillis;
+        lastTimeDeltaMillis = float(timeDeltaMillis);
         delay(10);
         statusSign = 1;
         }
@@ -254,10 +254,14 @@ void loop() {
             unsigned long passedMillis = nowMillis - lastIntervalStart - lastTimeDeltaMillis;
 
             if ( passedMillis > (lastTimeDeltaMillis) and power > 0){
+
                 // reduce time if for longer time no impulse was fetched
-                power = 360000 * ORWE_DECIWH_PER_PULSE / passedMillis;
-                // Serial.println("red : now:" + String(nowMillis) + " lastTimeDeltaMillis:" + String(lastTimeDeltaMillis)+ " passedMillis:" + String(passedMillis));
-                statusSign = ' ';
+                float decrement = ( passedMillis - (lastTimeDeltaMillis / 2) ) / passedMillis;
+
+                power = ( 360000 * ORWE_DECIWH_PER_PULSE / passedMillis ) * decrement;
+                //Serial.println("red : now:" + String(nowMillis) + " lastTimeDeltaMillis:" + String(lastTimeDeltaMillis)
+                //             + " passedMillis:" + String(passedMillis)+ " decrFactor:" + String(decrement));
+                statusSign = 32;
                 }
 
             if ( passedMillis > 720000 and power > 0){
@@ -294,7 +298,7 @@ void loop() {
             //reset the new wh counter for the new day
             storage.days_cWh[tmh.getDayOfWeek(0)] = 0; 
 
-            storeEEprom(EE_OFFSET);       
+            storeEEprom();       
 
             // finally fill the value from yesterday in the dayOfYear array in EEPROM
             // 1000 centiWh = 1 hectoWh
@@ -324,7 +328,7 @@ void loop() {
                 lcd.write(statusSign);
                 lcd.print(" " + leftFill(String(kwh, 2), 5, " ") + "kWh");
                 lcd.setCursor(0,1);
-                lcd.print(leftFill(String(temp), 4, " ") + "\xdf" + " " +
+                lcd.print(leftFill(String(temp), 2, " ") + "\xdf" + "" +
                           leftFill(String(temp_2), 3, " ") + "\xdf" + " " +
                           tmh.getHrsMinSec());
                 break;
@@ -434,7 +438,7 @@ void loop() {
             switch (kbdValue)
                 {
                 case KEY_ENTER:
-                    storeEEprom(EE_OFFSET);
+                    storeEEprom();
                     break;
 
                 case KEY_RIGHT:
@@ -474,11 +478,10 @@ void loop() {
                     handleKeystroke_setDateTime();
                     break;
 
-                case 30 ... 34: 
-                    handleKeystroke_setConfigMenu();
-                    break;
                 default:
                     break;
                 }
+
+            handleKeystroke_setConfigMenu();
         }
 }

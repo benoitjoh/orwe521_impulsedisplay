@@ -10,6 +10,8 @@
 #define SETCONFIG_KEY_LEFT  (30 + KEY_LEFT) 
 #define SETCONFIG_KEY_UP    (30 + KEY_UP) 
 #define SETCONFIG_KEY_DOWN  (30 + KEY_DOWN) 
+#define SETCONFIG_KEY_UP_LONG    (30 + KEY_UP_LONG) 
+#define SETCONFIG_KEY_DOWN_LONG  (30 + KEY_DOWN_LONG) 
 
 
 
@@ -28,7 +30,7 @@ struct cfgBdr_t
 
 {
 //  min   max   step    name
-    {-255,   255,  1,  "tCor"},
+    {-2000,   2000,  1,  "tCor"},
     {1,   50,   1,  "v1"},
     {50,  90,   10, "v2"},
     {0,  100,   5,  "v3"},
@@ -52,6 +54,25 @@ void display_setConfigMenu()
     return;
 }
 
+void incValue(byte step) {
+    newVal = storage.cfg[codeAddr] + step;
+    if (newVal > cfgBoundary[codeAddr].maxVal) {
+        storage.cfg[codeAddr] = cfgBoundary[codeAddr].minVal;
+        }
+    else {
+        storage.cfg[codeAddr] = newVal;
+        }
+    }
+    
+void decValue(byte step) {
+    newVal = storage.cfg[codeAddr] - step;
+    if (newVal < cfgBoundary[codeAddr].minVal or newVal > cfgBoundary[codeAddr].maxVal) {
+        storage.cfg[codeAddr] = cfgBoundary[codeAddr].maxVal;
+        }
+    else {
+        storage.cfg[codeAddr] = newVal;
+        }
+    }
 
 void handleKeystroke_setConfigMenu() {
     switch (kbdValue) {
@@ -59,7 +80,7 @@ void handleKeystroke_setConfigMenu() {
         // finish
         displayMode = 0;
         kbdValue = 255; 
-        storeEEprom(EE_OFFSET);
+        storeEEprom();
         break;
         
     case SETCONFIG_KEY_RIGHT:
@@ -73,23 +94,19 @@ void handleKeystroke_setConfigMenu() {
         break;
         
     case SETCONFIG_KEY_UP: //increment value
-        newVal = storage.cfg[codeAddr] + cfgBoundary[codeAddr].step;
-        if (newVal > cfgBoundary[codeAddr].maxVal) {
-            storage.cfg[codeAddr] = cfgBoundary[codeAddr].minVal;
-            }
-        else {
-            storage.cfg[codeAddr] = newVal;
-            }
+        incValue(cfgBoundary[codeAddr].step);
+        break;
+        
+    case SETCONFIG_KEY_UP_LONG: //increment value more
+        incValue(cfgBoundary[codeAddr].step * 100);
         break;
         
     case SETCONFIG_KEY_DOWN: //decrement value
-        newVal = storage.cfg[codeAddr] - cfgBoundary[codeAddr].step;
-        if (newVal < cfgBoundary[codeAddr].minVal or newVal > cfgBoundary[codeAddr].maxVal) {
-            storage.cfg[codeAddr] = cfgBoundary[codeAddr].maxVal;
-            }
-        else {
-            storage.cfg[codeAddr] = newVal;
-            }
+        decValue(cfgBoundary[codeAddr].step);
+        break;
+
+    case SETCONFIG_KEY_DOWN_LONG: //decrement value
+        decValue(cfgBoundary[codeAddr].step * 100);
         break;
     }
 }

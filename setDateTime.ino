@@ -42,7 +42,7 @@ void handleKeystroke_setDateTime() {
       lcd.noBlink();
       setInitialized = false;
       tmh.resetSecToZero();
-      storeEEprom(EE_OFFSET);
+      storeEEprom();
       break;
     case SETTIME_KEY_RIGHT: // right (key 1 in set date time mode
         settingIdx++;
