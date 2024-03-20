@@ -19,7 +19,7 @@
 #define ORWE_DECIWH_PER_PULSE ( 10000 / ORWE_PULSE_PER_KWH )
 
 // alarm for second temp sensor
-#define FRIDGE_TEMP_MAX -10
+// alarm limit defined in storage.cfg[CONF_FRIDGE_ALARM]
 boolean fridge_alarm = false;
 boolean fridge_quit = false;
 
@@ -90,17 +90,17 @@ String leftFill(String a, byte wantedLen, String fillLetter) {
 
 // --- Variables that will be stored in eeprom persistent actually 100byte long --- 
 struct {
-long secondsCounter = 11769;
-long dayCounter = 1525;
-unsigned long totalWh = 596850;
-unsigned long days_cWh[7] = {180,16100,16380,19550,510,1060,640,};
-unsigned long months_cWh[13] = {0,480,1650,1950,0,0,0,0,0,0,223000,278100,71640,};
-int cfg[CONF_ADDR_COUNT] = {423,6,-1,-1,-1,-1,-1,-1,};
+long secondsCounter = 76500;
+long dayCounter = 1540;
+unsigned long totalWh = 9571800;
+unsigned long days_cWh[7] = {7950,37570,7080,35850,20330,9760,11550,};
+unsigned long months_cWh[13] = {0,280550,394850,288930,720580,919470,1123920,927750,809320,966570,603040,223820,226410,};
+int cfg[CONF_ADDR_COUNT] = {423,-15,-1,-1,-1,-1,-1,-1,};
 } storage;
 
 // *** config paramters adjustable in configMenu ************************************** //
 #define CONF_TIMECORR_MS_PER_HOUR 0
-#define CONF_V1 1
+#define CONF_FRIDGE_ALARM 1
 #define CONF_V2 2
 #define CONF_V3 3
 #define CONF_V4 4
@@ -276,7 +276,7 @@ void loop() {
             temp_2 = read_dellakku_tempsensor(analogRead(ANALOG_TEMP_DELL_PIN));
 
             // fridge alarm
-            if (temp_2 > FRIDGE_TEMP_MAX) {
+            if (temp_2 > storage.cfg[CONF_FRIDGE_ALARM]) {
                 if ( !fridge_quit ) {
                     fridge_alarm = true;
                     }
