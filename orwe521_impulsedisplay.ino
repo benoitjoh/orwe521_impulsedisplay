@@ -75,10 +75,22 @@ String leftFill(String a, byte wantedLen, String fillLetter) {
     while (a.length() < wantedLen) {
         a = fillLetter + a;
         }
+        
+    for (byte i=0; i<wantedLen; i++) {
+        if (a[i] == '-') {
+            a[i] = 4;
+            }
+        }
     return a;
     }
 
-
+byte divideAndRoundBy(unsigned long value, int dividend) {
+    // divide by dividend [10, 100, 1000] and round 
+    byte result = byte(value / dividend);
+    if ( value % dividend  > ((dividend / 2) - 1) ) {
+        result +=1;
+        }
+}
 
 // EEPROM ------------------------------------------------------------------
 #include <EEPROM.h>
@@ -95,6 +107,7 @@ long dayCounter = 1540;
 unsigned long totalWh = 9571800;
 unsigned long days_cWh[7] = {7950,37570,7080,35850,20330,9760,11550,};
 unsigned long months_cWh[13] = {0,280550,394850,288930,720580,919470,1123920,927750,809320,966570,603040,223820,226410,};
+unsigned int hour_cWh[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 int cfg[CONF_ADDR_COUNT] = {423,-15,-1,-1,-1,-1,-1,-1,};
 } storage;
 
@@ -159,8 +172,6 @@ byte getDayOfYearTotal(int dayOfYear) {
     }
 
 
-
-
 // Initialization ---------------------------------------------------------------------------
 
 void setup() {
@@ -187,7 +198,7 @@ void setup() {
         }
 
     loadEEprom( doReset, EE_OFFSET );
-
+    actualMonth = tmh.getMonth(0);
     setBacklight(1);
 
 
@@ -223,6 +234,7 @@ void loop() {
         PORTB |=  B00100000; //set pin13 to HIGH (for a long blink)
         storage.days_cWh[tmh.getDayOfWeek(0)] += ORWE_DECIWH_PER_PULSE;
         storage.months_cWh[tmh.getMonth(0)] += ORWE_DECIWH_PER_PULSE;
+        storage.hour_cWh[tmh.getHour()] += ORWE_DECIWH_PER_PULSE;
         storage.totalWh += ORWE_DECIWH_PER_PULSE;
         power = 360000 * ORWE_DECIWH_PER_PULSE / timeDeltaMillis; 
         Serial.println("loop: now:" + String(nowMillis) + " delta:" + String(timeDeltaMillis)+ " pwr:" + String(power));
@@ -286,6 +298,12 @@ void loop() {
                 fridge_quit = false;
                 }
             
+            if ( tmh.getSecondsCounter() % 3600 == 1) {
+                // new hour started... so reset the actual counter 
+                storage.hour_cWh[tmh.getHour()] = 0;
+                Serial.println("new hour."); 
+                }
+
             } // --- 1 sec    
 
         if ( timeState >= 3 ) {
@@ -297,19 +315,14 @@ void loop() {
             }
             //reset the new wh counter for the new day
             storage.days_cWh[tmh.getDayOfWeek(0)] = 0; 
-
             storeEEprom();       
 
-            // finally fill the value from yesterday in the dayOfYear array in EEPROM
-            // 1000 centiWh = 1 hectoWh
-            byte yesterdayTotal_hWh = byte(storage.days_cWh[tmh.getDayOfWeek(-1)] / 1000);
-            if (storage.days_cWh[tmh.getDayOfWeek(-1)] % 1000  > 499) {
-                yesterdayTotal_hWh +=1;
-                }
-
-            updateDayOfYearTotal(tmh.getDayOfYear(-1), yesterdayTotal_hWh);
+            // fill the value from yesterday in the dayOfYear array in EEPROM as hektoWh (=1000 centiWh)
+            updateDayOfYearTotal(tmh.getDayOfYear(-1), 
+                                divideAndRoundBy(storage.days_cWh[tmh.getDayOfWeek(-1)], 1000) );
             }  
                  
+        
         actualMonth = tmh.getMonth(0);
 
         PORTB &= ~B00100000; //set pin13 to LOW 

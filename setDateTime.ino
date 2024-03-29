@@ -23,7 +23,7 @@ void display_setDateTime() {
 
     lcd.clear();
     lcd.setCursor(0,0);
-    lcd.print("Set time  " + tmh.getDayOfWeekName(0) + "  " + tmh.getSec()); 
+    lcd.print("Set time  " + tmh.getDayOfWeekName(0) + "  " + String(tmh.getSec())); 
     lcd.setCursor(0,1);
     /// pos        1  4    9  c  f
     /// show     "dd.mm.yyyy hh:mm" the :ss is cut of

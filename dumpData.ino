@@ -30,6 +30,12 @@ void dumpEpromToSerial() {
   }  
   Serial.println(F("};\n} storage;\n"));
   
+  Serial.println(F("\n\n ---- hourly values (cWh) -----"));
+  for (int i=0; i<24; i++) {
+    Serial.println(String(i) + ";" + String(storage.hour_cWh[i]));
+    delay(1);
+  }
+  
   Serial.println(F("\n\n ---- dayOfYear_Totals -----"));
   Serial.println(F("day;Wh"));
   for (int i=0; i<367; i++) {
