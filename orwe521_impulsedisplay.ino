@@ -102,13 +102,13 @@ byte divideAndRoundBy(unsigned long value, int dividend) {
 
 // --- Variables that will be stored in eeprom persistent actually 100byte long --- 
 struct {
-long secondsCounter = 76500;
-long dayCounter = 1540;
-unsigned long totalWh = 9571800;
-unsigned long days_cWh[7] = {7950,37570,7080,35850,20330,9760,11550,};
-unsigned long months_cWh[13] = {0,280550,394850,288930,720580,919470,1123920,927750,809320,966570,603040,223820,226410,};
+long secondsCounter = 46886;
+long dayCounter = 1551;
+unsigned long totalWh = 9817840;
+unsigned long days_cWh[7] = {41520, 33300, 3870, 18020, 15220, 3790, 12380, };
+unsigned long months_cWh[13] = {0, 280550, 394850, 534970, 720580, 919470, 1123920, 927750, 809320, 966570, 603040, 223820, 226410, };
 unsigned int hour_cWh[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-int cfg[CONF_ADDR_COUNT] = {423,-15,-1,-1,-1,-1,-1,-1,};
+int cfg[CONF_ADDR_COUNT] = {450, -10, 9, 14, 0, 0, 0, -1, };
 } storage;
 
 // *** config paramters adjustable in configMenu ************************************** //
@@ -191,8 +191,8 @@ void setup() {
     if (analogRead(PIN_ANALOG_KBD) > 100) {
         lcd.setCursor(0,0);
         lcd.print(F("ovewrite EEPROM?"));
-        lcd.setCursor(2,1);
-        lcd.print(F("yes --> Enter"));
+        lcd.setCursor(0,1);
+        lcd.print(F("  yes --> Enter "));
         byte kbdResult = kbd.wait_till_read();
         doReset = bool(kbdResult == 0);
         }
@@ -232,11 +232,14 @@ void loop() {
         // one impulse received means 1 Wh was comsumed. time passed since last impulse --> power
 
         PORTB |=  B00100000; //set pin13 to HIGH (for a long blink)
+
         storage.days_cWh[tmh.getDayOfWeek(0)] += ORWE_DECIWH_PER_PULSE;
         storage.months_cWh[tmh.getMonth(0)] += ORWE_DECIWH_PER_PULSE;
         storage.hour_cWh[tmh.getHour()] += ORWE_DECIWH_PER_PULSE;
         storage.totalWh += ORWE_DECIWH_PER_PULSE;
+
         power = 360000 * ORWE_DECIWH_PER_PULSE / timeDeltaMillis; 
+
         Serial.println("loop: now:" + String(nowMillis) + " delta:" + String(timeDeltaMillis)+ " pwr:" + String(power));
         lastIntervalStart = millis() - timeDeltaMillis;
         lastTimeDeltaMillis = float(timeDeltaMillis);
@@ -304,24 +307,24 @@ void loop() {
                 Serial.println("new hour."); 
                 }
 
-            } // --- 1 sec    
 
-        if ( timeState >= 3 ) {
-            // ----  action at midnight: fill the history --------------------------
+            if ( timeState >= 3 ) {
+                // ----  action at midnight: fill the history --------------------------
 
-            if ( actualMonth != tmh.getMonth(0) ) {
-                // new month has started... so reset the actual counter 
-                storage.months_cWh[tmh.getMonth(0)] = 0;
-            }
-            //reset the new wh counter for the new day
-            storage.days_cWh[tmh.getDayOfWeek(0)] = 0; 
-            storeEEprom();       
+                if ( actualMonth != tmh.getMonth(0) ) {
+                    // new month has started... so reset the actual counter
+                    storage.months_cWh[tmh.getMonth(0)] = 0;
+                }
+                //reset the new wh counter for the new day
+                storage.days_cWh[tmh.getDayOfWeek(0)] = 0;
+                storeEEprom();
 
-            // fill the value from yesterday in the dayOfYear array in EEPROM as hektoWh (=1000 centiWh)
-            updateDayOfYearTotal(tmh.getDayOfYear(-1), 
-                                divideAndRoundBy(storage.days_cWh[tmh.getDayOfWeek(-1)], 1000) );
-            }  
-                 
+                // fill the value from yesterday in the dayOfYear array in EEPROM as hektoWh (=1000 centiWh)
+                updateDayOfYearTotal(tmh.getDayOfYear(-1),
+                                    divideAndRoundBy(storage.days_cWh[tmh.getDayOfWeek(-1)], 1000) );
+                }
+
+            } // --- 1 sec
         
         actualMonth = tmh.getMonth(0);
 

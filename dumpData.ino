@@ -36,12 +36,12 @@ void dumpEpromToSerial() {
     delay(1);
   }
   
-  Serial.println(F("\n\n ---- dayOfYear_Totals -----"));
+  /*Serial.println(F("\n\n ---- dayOfYear_Totals -----"));
   Serial.println(F("day;Wh"));
   for (int i=0; i<367; i++) {
     Serial.println(String(i) + ";" + String(getDayOfYearTotal(i) * 100));
     delay(1);
-  }
+  } */
 
 }
    
