@@ -46,7 +46,7 @@ unsigned long getStableSignalDelta(byte pin) {
                 lastSignalStartMillis = signalStartMillis;
                 waitForValidation = false;
                 waitForReset = true;
-                Serial.println("act:" + String(signalStartMillis) + " delta:" + String(timeDeltaMillis));
+                //Serial.println("act:" + String(signalStartMillis) + " delta:" + String(timeDeltaMillis));
             }
         }
     }

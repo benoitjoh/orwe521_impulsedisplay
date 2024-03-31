@@ -104,10 +104,10 @@ byte divideAndRoundBy(unsigned long value, int dividend) {
 struct {
 long secondsCounter = 46886;
 long dayCounter = 1551;
-unsigned long totalWh = 9817840;
-unsigned long days_cWh[7] = {41520, 33300, 3870, 18020, 15220, 3790, 12380, };
-unsigned long months_cWh[13] = {0, 280550, 394850, 534970, 720580, 919470, 1123920, 927750, 809320, 966570, 603040, 223820, 226410, };
-unsigned int hour_cWh[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+unsigned long totaldWh = 9817840;
+unsigned long days_dWh[7] = {41520, 33300, 3870, 18020, 15220, 3790, 12380, };
+unsigned long months_dWh[13] = {0, 280550, 394850, 534970, 720580, 919470, 1123920, 927750, 809320, 966570, 603040, 223820, 226410, };
+unsigned int hour_dWh[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 int cfg[CONF_ADDR_COUNT] = {450, -10, 9, 14, 0, 0, 0, -1, };
 } storage;
 
@@ -233,10 +233,10 @@ void loop() {
 
         PORTB |=  B00100000; //set pin13 to HIGH (for a long blink)
 
-        storage.days_cWh[tmh.getDayOfWeek(0)] += ORWE_DECIWH_PER_PULSE;
-        storage.months_cWh[tmh.getMonth(0)] += ORWE_DECIWH_PER_PULSE;
-        storage.hour_cWh[tmh.getHour()] += ORWE_DECIWH_PER_PULSE;
-        storage.totalWh += ORWE_DECIWH_PER_PULSE;
+        storage.days_dWh[tmh.getDayOfWeek(0)] += ORWE_DECIWH_PER_PULSE;
+        storage.months_dWh[tmh.getMonth(0)] += ORWE_DECIWH_PER_PULSE;
+        storage.hour_dWh[tmh.getHour()] += ORWE_DECIWH_PER_PULSE;
+        storage.totaldWh += ORWE_DECIWH_PER_PULSE;
 
         power = 360000 * ORWE_DECIWH_PER_PULSE / timeDeltaMillis; 
 
@@ -303,7 +303,7 @@ void loop() {
             
             if ( tmh.getSecondsCounter() % 3600 == 1) {
                 // new hour started... so reset the actual counter 
-                storage.hour_cWh[tmh.getHour()] = 0;
+                storage.hour_dWh[tmh.getHour()] = 0;
                 Serial.println("new hour."); 
                 }
 
@@ -313,15 +313,15 @@ void loop() {
 
                 if ( actualMonth != tmh.getMonth(0) ) {
                     // new month has started... so reset the actual counter
-                    storage.months_cWh[tmh.getMonth(0)] = 0;
+                    storage.months_dWh[tmh.getMonth(0)] = 0;
                 }
                 //reset the new wh counter for the new day
-                storage.days_cWh[tmh.getDayOfWeek(0)] = 0;
+                storage.days_dWh[tmh.getDayOfWeek(0)] = 0;
                 storeEEprom();
 
                 // fill the value from yesterday in the dayOfYear array in EEPROM as hektoWh (=1000 centiWh)
                 updateDayOfYearTotal(tmh.getDayOfYear(-1),
-                                    divideAndRoundBy(storage.days_cWh[tmh.getDayOfWeek(-1)], 1000) );
+                                    divideAndRoundBy(storage.days_dWh[tmh.getDayOfWeek(-1)], 1000) );
                 }
 
             } // --- 1 sec
@@ -330,7 +330,7 @@ void loop() {
 
         PORTB &= ~B00100000; //set pin13 to LOW 
 
-        float kwh = storage.days_cWh[tmh.getDayOfWeek(0)] / 10000.0;
+        float kwh = storage.days_dWh[tmh.getDayOfWeek(0)] / 10000.0;
 
 
         // ---- refresh display ----------------------------------------------------------------------------
@@ -352,7 +352,7 @@ void loop() {
             case 2:
                 // -- display overall kWh
                 lcd.clear();
-                kwh = storage.totalWh / 10000.0;
+                kwh = storage.totaldWh / 10000.0;
                 lcd.print("Ges.: " + leftFill(String(kwh, 2), 7, " ") + "kWh");
                 break; 
 
@@ -389,16 +389,16 @@ void loop() {
                     case 4 ... 8:
                         // days hist
                         index = - (displayMode - 3);
-                        wh1 = storage.days_cWh[tmh.getDayOfWeek(index)];
-                        wh2 = storage.days_cWh[tmh.getDayOfWeek(index -1)];
+                        wh1 = storage.days_dWh[tmh.getDayOfWeek(index)];
+                        wh2 = storage.days_dWh[tmh.getDayOfWeek(index -1)];
                         lbl1 = tmh.getDayOfWeekName(index);
                         lbl2 = tmh.getDayOfWeekName(index - 1);
                         break;
                     case 10 ... 22:
                         // months hist
                         index = - (displayMode - 10);
-                        wh1 = storage.months_cWh[tmh.getMonth(index)];
-                        wh2 = storage.months_cWh[tmh.getMonth(index - 1)];
+                        wh1 = storage.months_dWh[tmh.getMonth(index)];
+                        wh2 = storage.months_dWh[tmh.getMonth(index - 1)];
                         lbl1 = tmh.getMonthName(index);
                         lbl2 = tmh.getMonthName(index - 1);
                         break;
