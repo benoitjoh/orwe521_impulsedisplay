@@ -23,6 +23,7 @@
 boolean fridge_alarm = false;
 boolean fridge_quit = false;
 
+unsigned long timeDeltaMillis;
 unsigned long power;
 unsigned long nowMillis;
 unsigned long lastIntervalStart;
@@ -68,6 +69,10 @@ byte kbdValue = 255; //the value that is read from keyboard 255 is neutral value
 // --- timer helpers from TimeLoop.cpp ---------------------------------------------
 #include<TimeLoop.h>
 TimeLoop tmh(0);
+
+
+#include<OrweMeasurement.h>
+OrweMeasurement orwe_solar(SIGNAL_PIN, ORWE_DECIWH_PER_PULSE);
 
 // ---- string helper   ---------------------------------------------------------------  
 String leftFill(String a, byte wantedLen, String fillLetter) {
@@ -201,9 +206,6 @@ void setup() {
     actualMonth = tmh.getMonth(0);
     setBacklight(1);
 
-
-    // pin for signal from OR-WE-521 
-    pinMode(SIGNAL_PIN, INPUT);
     pinMode(13, OUTPUT);
 
     // serial device for debugging purpose!
