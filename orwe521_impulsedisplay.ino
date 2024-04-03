@@ -96,18 +96,22 @@ byte divideAndRoundBy(unsigned long value, int dividend) {
 #include <EEPROM.h>
 
 #define EE_OFFSET 0  // start adress for the EEPROM data area 
-#define EE_OFFSET_DOY 128 //start adress for the 367 bytes where the daily revenue for all Days of Year is stored
-
 #define CONF_ADDR_COUNT   8  // how many values do we have in the conf array? 
 
 // --- Variables that will be stored in eeprom persistent actually 100byte long --- 
 struct {
-long secondsCounter = 46886;
-long dayCounter = 1551;
-unsigned long totaldWh = 9817840;
-unsigned long days_dWh[7] = {41520, 33300, 3870, 18020, 15220, 3790, 12380, };
+long secondsCounter = 79200;
+long dayCounter = 1555;
+unsigned long totaldWh = 9878580;
+unsigned long days_dWh[7] = {8980, 26420, 6830, 18020, 15220, 8360, 13940, };
 unsigned long months_dWh[13] = {0, 280550, 394850, 534970, 720580, 919470, 1123920, 927750, 809320, 966570, 603040, 223820, 226410, };
-unsigned int hour_dWh[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+unsigned int hour_dWh[7][24] = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+                                {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+                                {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+                                {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+                                {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+                                {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+                                {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}};
 int cfg[CONF_ADDR_COUNT] = {450, -10, 9, 14, 0, 0, 0, -1, };
 } storage;
 
@@ -154,21 +158,6 @@ void storeEEprom() {
     lcd.setCursor(0,1);
     lcd.print(F("data saved. "));
     delay(500);
-    }
-
-// --------  array of 367 values in eeprom for each day of year that holds 
-//           the day sumary (in hecto Watt hours) -----
-//           i=1 is first of january
-
-void updateDayOfYearTotal(int dayOfYear, byte value) {
-    EEPROM.update(EE_OFFSET_DOY + dayOfYear, value);
-    }
-
-
-byte getDayOfYearTotal(int dayOfYear) {
-    byte value;
-    EEPROM.get(EE_OFFSET_DOY + dayOfYear, value);
-    return value;
     }
 
 
@@ -235,7 +224,7 @@ void loop() {
 
         storage.days_dWh[tmh.getDayOfWeek(0)] += ORWE_DECIWH_PER_PULSE;
         storage.months_dWh[tmh.getMonth(0)] += ORWE_DECIWH_PER_PULSE;
-        storage.hour_dWh[tmh.getHour()] += ORWE_DECIWH_PER_PULSE;
+        storage.hour_dWh[tmh.getDayOfWeek(0)][tmh.getHour()] += ORWE_DECIWH_PER_PULSE;
         storage.totaldWh += ORWE_DECIWH_PER_PULSE;
 
         power = 360000 * ORWE_DECIWH_PER_PULSE / timeDeltaMillis; 
@@ -303,7 +292,7 @@ void loop() {
             
             if ( tmh.getSecondsCounter() % 3600 == 1) {
                 // new hour started... so reset the actual counter 
-                storage.hour_dWh[tmh.getHour()] = 0;
+                storage.hour_dWh[tmh.getDayOfWeek(0)][tmh.getHour()] = 0;
                 Serial.println("new hour."); 
                 }
 
@@ -319,9 +308,6 @@ void loop() {
                 storage.days_dWh[tmh.getDayOfWeek(0)] = 0;
                 storeEEprom();
 
-                // fill the value from yesterday in the dayOfYear array in EEPROM as hektoWh (=1000 centiWh)
-                updateDayOfYearTotal(tmh.getDayOfYear(-1),
-                                    divideAndRoundBy(storage.days_dWh[tmh.getDayOfWeek(-1)], 1000) );
                 }
 
             } // --- 1 sec

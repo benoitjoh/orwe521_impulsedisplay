@@ -30,18 +30,14 @@ void dumpEpromToSerial() {
   }  
   Serial.println(F("};\n} storage;\n"));
   
-  Serial.println(F("\nhourly values (Wh)"));
-  for (int i=0; i<24; i++) {
-    Serial.println(String(i) + ";" + String(storage.hour_dWh[i]/10));
-    delay(1);
+  Serial.println(F("\nhourly values (Wh)\nh;mo;tu;we;th;fr;sa;su"));
+  for (int hour=0; hour<24; hour++) {
+    Serial.print(String(hour) + ";");
+    for (int dow=0; dow<7; dow++) {
+      Serial.print(String(storage.hour_dWh[dow][hour]/10) + ";");
+    delay(0);
+    }
+    Serial.println("");
   }
-  
-  /*Serial.println(F("\n\n ---- dayOfYear_Totals -----"));
-  Serial.println(F("day;Wh"));
-  for (int i=0; i<367; i++) {
-    Serial.println(String(i) + ";" + String(getDayOfYearTotal(i) * 100));
-    delay(1);
-  } */
-
 }
-   
+
