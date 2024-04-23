@@ -4,9 +4,9 @@
 
 void dumpEpromToSerial() {
   lcd.clear();
-  lcd.write(F("dump data to"));
+  lcd.print(F("dump data to"));
   lcd.setCursor(0,1);
-  lcd.write(F("  serial port.."));
+  lcd.print(F("  serial port.."));
   Serial.println(F("// dump of configuration and data structure //"));
   Serial.println(F("struct {"));
   Serial.println("long secondsCounter = " + String(storage.secondsCounter) + ";");
