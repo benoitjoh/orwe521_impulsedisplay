@@ -13,9 +13,9 @@
     */
 
 #include "config.h"
-#define VERSION "v1.2/" __DATE__
+#define VERSION "v1.3/" __DATE__
 
-#define ORWE_PULSE_PER_KWH 1000
+#define ORWE_PULSE_PER_KWH 800
 #define ORWE_DECIWH_PER_PULSE ( 10000 / ORWE_PULSE_PER_KWH )
 
 // alarm for second temp sensor
@@ -258,14 +258,10 @@ void loop() {
             unsigned long passedMillis = nowMillis - lastIntervalStart - lastTimeDeltaMillis;
 
             if ( passedMillis > (lastTimeDeltaMillis) and power > 0){
-
                 // reduce time if for longer time no impulse was fetched
-                float decrement = ( passedMillis - (lastTimeDeltaMillis / 2) ) / passedMillis;
-
-                power = ( 360000 * ORWE_DECIWH_PER_PULSE / passedMillis ) * decrement;
-                //Serial.println("red : now:" + String(nowMillis) + " lastTimeDeltaMillis:" + String(lastTimeDeltaMillis)
-                //             + " passedMillis:" + String(passedMillis)+ " decrFactor:" + String(decrement));
-                statusSign = 32;
+                power = 360000 * ORWE_DECIWH_PER_PULSE / passedMillis;
+                // Serial.println("red : now:" + String(nowMillis) + " lastTimeDeltaMillis:" + String(lastTimeDeltaMillis)+ " passedMillis:" + String(passedMillis));
+                statusSign = ' ';
                 }
 
             if ( passedMillis > 720000 and power > 0){
@@ -303,7 +299,8 @@ void loop() {
                 if ( actualMonth != tmh.getMonth(0) ) {
                     // new month has started... so reset the actual counter
                     storage.months_dWh[tmh.getMonth(0)] = 0;
-                }
+                    actualMonth = tmh.getMonth(0);
+               }
                 //reset the new wh counter for the new day
                 storage.days_dWh[tmh.getDayOfWeek(0)] = 0;
                 storeEEprom();
@@ -312,8 +309,7 @@ void loop() {
 
             } // --- 1 sec
         
-        actualMonth = tmh.getMonth(0);
-
+ 
         PORTB &= ~B00100000; //set pin13 to LOW 
 
         float kwh = storage.days_dWh[tmh.getDayOfWeek(0)] / 10000.0;
